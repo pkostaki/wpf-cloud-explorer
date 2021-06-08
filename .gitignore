@@ -1,0 +1,21 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/wpf-cloud-explorer/obj
+/wpf-cloud-explorer/.vs/wpf-cloud-explorer/v16
+/CustomControlLibrary/bin/Debug/net5.0-windows
+/CustomControlLibrary/obj
+/Explorer.Tests/obj
+/Lib/bin/Debug/net5.0-windows
+/Lib/obj
+/StorageLib/bin/Debug/net5.0
+/StorageLib/obj
+/TestProject1/bin/Debug/net5.0
+/TestProject1/obj
+/wpf-cloud-explorer/bin/Debug/net5.0-windows
+/__arh
+/StorageTest/bin/Debug/net5.0
+/StorageTest/obj
+/WpfCloudExplorer/bin/Debug/net5.0-windows
+/WpfCloudExplorer/obj

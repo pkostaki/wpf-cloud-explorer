@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.51.0.2320" />
+    <PackageReference Include="Microsoft.Graph" Version="3.33.0" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.31.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="4.3.0" />
+  </ItemGroup>
+	
+</Project>
