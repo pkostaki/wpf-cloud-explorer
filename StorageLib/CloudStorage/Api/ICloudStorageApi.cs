@@ -12,6 +12,11 @@ namespace StorageLib.CloudStorage.Api
     public interface ICloudStorageApi: IDisposable
     {
         /// <summary>
+        /// Name of storage.
+        /// </summary>
+        string CloudStorageName { get; }
+
+        /// <summary>
         /// Get root resource.
         /// </summary>
         /// <returns>Operation result.</returns>

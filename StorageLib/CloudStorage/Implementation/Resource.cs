@@ -10,10 +10,11 @@ namespace StorageLib.CloudStorage.Implementation
 {
     public abstract class Resource : IResource
     {
-        public ICloudStorageApi Api { get;  set; }
+        public ICloudStorageApi Api { get; set; }
         public IResource Parent { get; set; }
-        public string ParentId { get;  set; }
-
+        public string ParentId { get; set; }
+        ///<inheritdoc/>
+        public string WebLink { get => _webLink; set => Set(ref _webLink, value); }
         public bool IsFolder { get; protected set; }
         public bool IsDestroyed { get; protected set; }
 
@@ -61,6 +62,8 @@ namespace StorageLib.CloudStorage.Implementation
         public string ResourceType { get => _resourceType; set => Set(ref _resourceType, value); }
 
         private long? _size;
+        private string _webLink;
+
         public long? Size { get => _size; set => Set(ref _size, value); }
 
         public abstract Task Load();
@@ -83,8 +86,6 @@ namespace StorageLib.CloudStorage.Implementation
             IsDestroyed = true;
             Parent = null;
         }
-
-
 
         public static class ResourceHelper
         {

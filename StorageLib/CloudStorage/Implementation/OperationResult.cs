@@ -1,5 +1,7 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace StorageLib.CloudStorage.Implementation
@@ -14,6 +16,7 @@ namespace StorageLib.CloudStorage.Implementation
         CopyFolder = 8,
         CutFile = 16,
         CutFolder = 32,
+        UploadFile = 64
     }
 
     public enum ResutlStatus
@@ -27,28 +30,40 @@ namespace StorageLib.CloudStorage.Implementation
     /// Class that describe result of operation.
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public class OperationResult<T>
+    public class OperationResult<T> : INotifyPropertyChanged
     {
+        private ResutlStatus _status = ResutlStatus.None;
+        private int _errorCode;
+        private string _errorMessage;
+
         /// <summary>
         /// Status of operation.
         /// </summary>
-        public ResutlStatus Status { get; set; } = ResutlStatus.None;
-
+        public ResutlStatus Status { get => _status; set => Set(ref _status, value); }
         /// <summary>
         /// Error code if available.
         /// </summary>
-        public int ErrorCode { get;  set; }
+        public int ErrorCode { get => _errorCode; set => Set(ref _errorCode, value); }
 
         /// <summary>
         /// Error message if available.
         /// </summary>
-        public string ErrorMessage { get;  set; }
+        public string ErrorMessage { get => _errorMessage; set => Set( ref  _errorMessage, value); }
 
         /// <summary>
         /// Result.
         /// </summary>
-        public T Result { get;  set; }
-        
+        public T Result { get; set; }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected void Set<K>(ref K property, K value, [CallerMemberName] string propName = null)
+        {
+            property = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
+        }
+
+
         /// <summary>
         /// Succeed with result.
         /// </summary>
@@ -72,8 +87,8 @@ namespace StorageLib.CloudStorage.Implementation
             ErrorCode = ex.HResult;
             ErrorMessage = ex.Message;
             return this;
-        }      
-        
+        }
+
         /// <summary>
         /// Failed with result.
         /// </summary>
@@ -85,8 +100,8 @@ namespace StorageLib.CloudStorage.Implementation
             ErrorCode = failedResult.ErrorCode;
             ErrorMessage = failedResult.ErrorMessage;
             return this;
-        }    
-        
+        }
+
         /// <summary>
         /// Complete with depending on request result.
         /// </summary>
@@ -99,8 +114,8 @@ namespace StorageLib.CloudStorage.Implementation
             ErrorMessage = result.ErrorMessage;
             Result = result.Result;
             return this;
-        }     
-        
+        }
+
         public async Task<OperationResult<T>> FailedBasedHttpResponce(HttpResponseMessage response)
         {
             Status = ResutlStatus.Failed;
@@ -111,7 +126,7 @@ namespace StorageLib.CloudStorage.Implementation
             }
             return this;
         }
-        
+
     }
 }
 

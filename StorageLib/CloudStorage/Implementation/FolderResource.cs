@@ -1,7 +1,4 @@
-﻿using StorageLib.CloudStorage.Api;
-using StorageLib.CloudStorage.Implementation;
-using System.Diagnostics;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace StorageLib.CloudStorage.Implementation
 {
@@ -32,13 +29,12 @@ namespace StorageLib.CloudStorage.Implementation
             }
         }
 
-        private async Task LoadInternal()
+        protected virtual async Task LoadInternal()
         {
             if (IsLoading || IsLoaded)
             {
                 return;
             }
-
             IsLoading = true;
             var result = await Api.GetNestedResources(Id);
             if (result.Status == ResutlStatus.Succeed)

@@ -37,7 +37,7 @@ namespace StorageLib
         UserCredential _credential;
         private async Task InitializeAsync()
         {
-            
+
 
             using (var stream =
                 new FileStream(_credentialsFilePath, FileMode.Open, FileAccess.Read))
@@ -54,7 +54,7 @@ namespace StorageLib
                 Debug.WriteLine("Credential file saved to: " + credPath);
             }
 
-            
+
             // Create Drive API service.
             _service = new DriveService(new BaseClientService.Initializer()
             {
@@ -78,10 +78,10 @@ namespace StorageLib
                 try
                 {
                     FilesResource.GetRequest getRequest = _service.Files.Get(id);
-                    getRequest.Fields = "id, name, iconLink, kind, size, mimeType, modifiedTime, fullFileExtension,trashed, parents";
+                    getRequest.Fields = "id, name, iconLink, kind, size, mimeType, modifiedTime, fullFileExtension,trashed, parents, webViewLink";
 
                     var file = await getRequest.ExecuteAsync();
-                    
+
 
                     var resource = CreateResourceInternal(file);
                     result.SucceedWithResult(resource);
@@ -110,7 +110,7 @@ namespace StorageLib
                         FilesResource.ListRequest listRequest = _service.Files.List();
                         listRequest.Q = $"parents = '{id}'";
                         listRequest.Spaces = "drive";
-                        listRequest.Fields = "nextPageToken, files(id, name, iconLink, kind, size, mimeType, modifiedTime, fullFileExtension,trashed)";
+                        listRequest.Fields = "nextPageToken, files(id, name, iconLink, kind, size, mimeType, modifiedTime, fullFileExtension,trashed, webViewLink)";
                         listRequest.PageToken = pagetoken;
 
                         IList<File> files = (await listRequest.ExecuteAsync()).Files;
@@ -143,33 +143,33 @@ namespace StorageLib
         ///<inheritdoc/>
         public Task<OperationResult<IResource>> Move(string id, string parentId, string targetId)
         {
-            return Task.Run( async ()=>
-            {
-                await _initialization.Task;
-                var result = new OperationResult<IResource>();
-                try
-                {
-                    File newFile = new();
-                    FilesResource.UpdateRequest request = _service.Files.Update(newFile, id);
-                    request.AddParents = targetId;
-                    request.RemoveParents = parentId;
+            return Task.Run(async () =>
+           {
+               await _initialization.Task;
+               var result = new OperationResult<IResource>();
+               try
+               {
+                   File newFile = new();
+                   FilesResource.UpdateRequest request = _service.Files.Update(newFile, id);
+                   request.AddParents = targetId;
+                   request.RemoveParents = parentId;
 
-                    request.Fields = "id, name, iconLink, kind, size, mimeType, modifiedTime, fullFileExtension,trashed, parents";
+                   request.Fields = "id, name, iconLink, kind, size, mimeType, modifiedTime, fullFileExtension,trashed, parents, webViewLink";
 
-                    File file = await request.ExecuteAsync();
-                    result.Result = CreateResourceInternal(file);
-                    result.Status = ResutlStatus.Succeed;
-                }
-                catch (Exception ex)
-                {
-                    result.FailedWithException(ex);
-                }
-                return result;
-            });
+                   File file = await request.ExecuteAsync();
+                   result.Result = CreateResourceInternal(file);
+                   result.Status = ResutlStatus.Succeed;
+               }
+               catch (Exception ex)
+               {
+                   result.FailedWithException(ex);
+               }
+               return result;
+           });
         }
 
         ///<inheritdoc/>
-        public Task<OperationResult< IResource>> Copy(string id, string targetId)
+        public Task<OperationResult<IResource>> Copy(string id, string targetId)
         {
             return Task.Run(async () =>
             {
@@ -180,8 +180,8 @@ namespace StorageLib
                     File copiedFile = new();
                     copiedFile.Parents = new List<string>() { targetId };
                     FilesResource.CopyRequest request = _service.Files.Copy(copiedFile, id);
-                    
-                    request.Fields = "id, name, iconLink, kind, size, mimeType, modifiedTime, fullFileExtension,trashed, parents";
+
+                    request.Fields = "id, name, iconLink, kind, size, mimeType, modifiedTime, fullFileExtension,trashed, parents, webViewLink";
 
                     File file = await request.ExecuteAsync();
                     result.Result = CreateResourceInternal(file);
@@ -203,7 +203,8 @@ namespace StorageLib
                 file.ModifiedTime,
                 file.Name,
                 file.Size,
-                file.MimeType);
+                file.MimeType,
+                file.WebViewLink);
             return resource;
         }
 
@@ -221,10 +222,10 @@ namespace StorageLib
             {
                 result.FailedWithException(ex);
             }
-            return result; 
+            return result;
         }
 
-        public Task<OperationResult<IResource>> Upload(string fileName,string parentId, Stream stream, string contentType)
+        public Task<OperationResult<IResource>> Upload(string fileName, string parentId, Stream stream, string contentType)
         {
             return Task.Run(async () =>
             {
@@ -252,13 +253,13 @@ namespace StorageLib
                         }
                     }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     result.FailedWithException(ex);
                 }
                 return result;
             });
-            
+
         }
 
         public async Task SignOut()
@@ -272,10 +273,19 @@ namespace StorageLib
             _service?.Dispose();
         }
 
-        private Operations _supportedOperations =  Operations.CopyFile | Operations.DeleteFile | Operations.DeleteFolder | Operations.CutFile | Operations.CutFolder;
+        ///<inheritdoc/>
+        public string CloudStorageName => "Google Drive";
+
+        private Operations _supportedOperations = Operations.CopyFile |
+                                                  Operations.DeleteFile |
+                                                  Operations.DeleteFolder |
+                                                  Operations.CutFile |
+                                                  Operations.CutFolder |
+                                                  Operations.UploadFile;
+
         public bool IsOperationSupported(Operations operation)
         {
-            return (operation&_supportedOperations) == operation;
+            return (operation & _supportedOperations) == operation;
         }
     }
 }

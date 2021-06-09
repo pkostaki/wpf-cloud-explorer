@@ -9,6 +9,11 @@ namespace StorageLib.CloudStorage.Api
     public interface IStorage: IDisposable
     {
         /// <summary>
+        /// Name of storage.
+        /// </summary>
+        string StorageName { get; }
+
+        /// <summary>
         /// List of resources.
         /// </summary>
         ObservableCollection<IResource> Resources { get; }

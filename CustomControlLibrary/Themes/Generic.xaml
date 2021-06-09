@@ -14,9 +14,10 @@
                             <StackPanel x:Name="Container" Orientation="Horizontal">
                                 <Image
                                     Height="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=local:OnlineStorageBrowser}, Path=IconSize, Mode=OneWay}"
+                                    MaxWidth="50"
                                     Margin="3"
                                     VerticalAlignment="Center"
-                                    Source="{Binding IconLink, TargetNullValue='pack://application:,,,/CustomControlLibrary;component/Assets/question-mark.png'}"
+                                    Source="{Binding IconLink, TargetNullValue='pack://application:,,,/CustomControlLibrary;component/Assets/question-mark.png', FallbackValue='pack://application:,,,/CustomControlLibrary;component/Assets/question-mark.png'}"
                                     Stretch="Uniform"
                                     StretchDirection="Both" />
                                 <TextBlock
@@ -73,7 +74,7 @@
                             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
                             <Setter Property="ContextMenu" Value="{StaticResource ResourceContextMenu}" />
                         </Style>
-
+                        <local:LongValueConvertor x:Key="NumericConvertor" />
                     </ControlTemplate.Resources>
                     <Border
                         Background="{TemplateBinding Background}"
@@ -94,7 +95,7 @@
                                 Grid.Column="0"
                                 Foreground="{TemplateBinding Foreground}"
                                 ItemTemplate="{StaticResource TreeItemTemplate}"
-                                ItemsSource="{Binding RelativeSource={RelativeSource Mode=TemplatedParent}, Path=StorageExplorer.Resources, Mode=OneWay}"
+                                ItemsSource="{Binding RelativeSource={RelativeSource Mode=TemplatedParent}, Path=Storage.Resources, Mode=OneWay}"
                                 VirtualizingStackPanel.IsVirtualizing="True"
                                 VirtualizingStackPanel.VirtualizationMode="Recycling" />
 
@@ -121,6 +122,7 @@
                                         <MenuItem
                                             Command="ApplicationCommands.Open"
                                             CommandParameter="outCell"
+                                            CommandTarget="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type ContextMenu}}, Path=PlacementTarget}"
                                             Header="Upload" />
                                     </ContextMenu>
                                 </DataGrid.ContextMenu>
@@ -163,9 +165,9 @@
                                 <DataGrid.Columns>
                                     <DataGridTemplateColumn CellTemplate="{StaticResource ResourceDataTemplate}" Header="Name" />
                                     <DataGridTextColumn Binding="{Binding Status}" Header="Status" />
-                                    <DataGridTextColumn Binding="{Binding ModifiedTime}" Header="Date modified" />
+                                    <DataGridTextColumn Binding="{Binding ModifiedTime, StringFormat={}{0:g}}" Header="Date modified" />
                                     <DataGridTextColumn Binding="{Binding ResourceType}" Header="Type" />
-                                    <DataGridTextColumn Binding="{Binding Size}" Header="Size" />
+                                    <DataGridTextColumn Binding="{Binding Size, Converter={StaticResource NumericConvertor}, ConverterParameter=0.0009765625, StringFormat={}{0:n2} kb}" Header="Size" />
                                 </DataGrid.Columns>
                             </DataGrid>
 
@@ -181,11 +183,11 @@
                                 VerticalAlignment="Bottom"
                                 Background="RosyBrown">
                                 <StatusBarItem>
-                                    <TextBlock Text="Online" />
+                                    <TextBlock Padding="3" Text="{TemplateBinding Status}" />
                                 </StatusBarItem>
-                                <StatusBarItem>
-                                    <!--<ProgressBar Width="160" IsIndeterminate="True"  />-->
-                                </StatusBarItem>
+                                <!--<StatusBarItem>
+                                    <ProgressBar Width="160" IsIndeterminate="True" />
+                                </StatusBarItem>-->
                             </StatusBar>
                         </Grid>
                     </Border>

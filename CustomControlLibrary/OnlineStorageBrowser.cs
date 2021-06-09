@@ -3,10 +3,12 @@ using StorageLib.CloudStorage.Api;
 using StorageLib.CloudStorage.Implementation;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using static StorageLib.CloudStorage.Implementation.Resource;
 
 namespace CustomControlLibrary
@@ -15,7 +17,10 @@ namespace CustomControlLibrary
     [TemplatePart(Name = "Part_TreeView", Type = typeof(TreeView))]
     public class OnlineStorageBrowser : Control
     {
-        #region Icon
+        #region Icon size
+        /// <summary>
+        /// Gets and sets icons size.
+        /// </summary>
         public double IconSize
         {
             get { return (double)GetValue(IconSizeProperty); }
@@ -27,16 +32,19 @@ namespace CustomControlLibrary
             DependencyProperty.Register("IconSize", typeof(double), typeof(OnlineStorageBrowser), new PropertyMetadata(20.0));
         #endregion
 
-        #region StorageExplorer
+        #region Storage
+        /// <summary>
+        /// Gets and sets storage.
+        /// </summary>
         public IStorage Storage
         {
-            get { return (IStorage)GetValue(StorageExplorerProperty); }
-            set { SetValue(StorageExplorerProperty, value); }
+            get { return (IStorage)GetValue(StorageProperty); }
+            set { SetValue(StorageProperty, value); }
         }
 
         // Using a DependencyProperty as the backing store for StorageExplorer.  This enables animation, styling, binding, etc...
-        public static readonly DependencyProperty StorageExplorerProperty =
-            DependencyProperty.Register("StorageExplorer", typeof(IStorage), typeof(OnlineStorageBrowser), new PropertyMetadata(null, OnProviderChanged));
+        public static readonly DependencyProperty StorageProperty =
+            DependencyProperty.Register(nameof(Storage), typeof(IStorage), typeof(OnlineStorageBrowser), new PropertyMetadata(null, OnProviderChanged));
 
         private static void OnProviderChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
@@ -55,6 +63,29 @@ namespace CustomControlLibrary
 
         #endregion
 
+        #region Status
+        // Using a DependencyProperty as the backing store for Status.  This enables animation, styling, binding, etc...
+        internal static readonly DependencyPropertyKey StatusPropertyKey =
+            DependencyProperty.RegisterReadOnly("Status", typeof(string), typeof(OnlineStorageBrowser), new PropertyMetadata("Disconnected"));
+
+        public static readonly DependencyProperty StatusProperty = StatusPropertyKey.DependencyProperty;
+
+        /// <summary>
+        /// Status of connected storage.
+        /// </summary>
+        public string Status
+        {
+            get { return (string)GetValue(StatusProperty); }
+        }
+
+
+
+
+        #endregion
+
+
+
+
         static OnlineStorageBrowser()
         {
             DefaultStyleKeyProperty.OverrideMetadata(typeof(OnlineStorageBrowser), new FrameworkPropertyMetadata(typeof(OnlineStorageBrowser)));
@@ -63,22 +94,6 @@ namespace CustomControlLibrary
         public OnlineStorageBrowser()
         {
             Unloaded += OnlineStorageBrowserOnUnloaded;
-
-
-            //InputBindings.Add(new KeyBinding(ApplicationCommands.Paste, Key.V, ModifierKeys.Control));
-            //CommandBindings.Add(new CommandBinding(ApplicationCommands.Paste, CanEx) );
-            CommandManager.AddPreviewCanExecuteHandler(this, OnPreviewCanExecuted);
-            CommandManager.AddPreviewExecutedHandler(this, OnPreviewExecuted);
-        }
-
-
-        private void OnPreviewExecuted(object sender, ExecutedRoutedEventArgs e)
-        {
-            
-        }
-
-        private void OnPreviewCanExecuted(object sender, CanExecuteRoutedEventArgs e)
-        {
         }
 
         private void OnlineStorageBrowserOnUnloaded(object sender, RoutedEventArgs e)
@@ -87,6 +102,7 @@ namespace CustomControlLibrary
 
             FinalizeUI();
             Storage = null;
+            _commandsHelper.ClearBuffer();
         }
 
         public override void OnApplyTemplate()
@@ -109,8 +125,8 @@ namespace CustomControlLibrary
                 if (_elementTreeView != null)
                 {
                     _elementTreeView.InputBindings.Clear();
-                    CommandManager.RemovePreviewCanExecuteHandler(_elementTreeView, OnTreeViewPreviewCanExecuted);
-                    CommandManager.RemovePreviewExecutedHandler(_elementTreeView, OnTreeViewPreviewExecuted);
+                    CommandManager.RemovePreviewCanExecuteHandler(_elementTreeView, PreviewCanExecuted);
+                    CommandManager.RemovePreviewExecutedHandler(_elementTreeView, PreviewExecuted);
                     _elementTreeView.SelectedItemChanged -= ElementTreeViewSelectedItemChanged;
                     _elementTreeView = null;
                 }
@@ -126,8 +142,8 @@ namespace CustomControlLibrary
                 _elementTreeView.InputBindings.Add(new KeyBinding(ApplicationCommands.Copy, Key.C, ModifierKeys.Control));
                 _elementTreeView.InputBindings.Add(new KeyBinding(ApplicationCommands.Open, Key.O, ModifierKeys.Control));
                 _elementTreeView.InputBindings.Add(new KeyBinding(ApplicationCommands.Delete, Key.Delete, ModifierKeys.None));
-                CommandManager.AddPreviewCanExecuteHandler(_elementTreeView, OnTreeViewPreviewCanExecuted);
-                CommandManager.AddPreviewExecutedHandler(_elementTreeView, OnTreeViewPreviewExecuted);
+                CommandManager.AddPreviewCanExecuteHandler(_elementTreeView, PreviewCanExecuted);
+                CommandManager.AddPreviewExecutedHandler(_elementTreeView, PreviewExecuted);
             }
         }
 
@@ -139,10 +155,11 @@ namespace CustomControlLibrary
             {
                 if (_elementDataGrid != null)
                 {
-                    _elementDataGrid.SelectionChanged -= ElementDataGridOnSelectionChanged;
                     _elementDataGrid.InputBindings.Clear();
-                    CommandManager.RemovePreviewExecutedHandler(_elementDataGrid, OnDataGridPreviewExecuted);
-                    CommandManager.RemovePreviewCanExecuteHandler(_elementDataGrid, OnDataGridPreviewCanExecuted);
+                    CommandManager.RemovePreviewCanExecuteHandler(_elementDataGrid, PreviewCanExecuted);
+                    CommandManager.RemovePreviewExecutedHandler(_elementDataGrid, PreviewExecuted);
+
+                    _elementDataGrid.PreviewMouseDoubleClick -= ElementDataGridOnMouseDoubleClick;
                     _elementDataGrid = null;
                 }
 
@@ -151,12 +168,46 @@ namespace CustomControlLibrary
                     return;
                 }
                 _elementDataGrid = value;
-                _elementDataGrid.SelectionChanged += ElementDataGridOnSelectionChanged;
                 _elementDataGrid.InputBindings.Add(new KeyBinding(ApplicationCommands.Cut, Key.X, ModifierKeys.Control));
                 _elementDataGrid.InputBindings.Add(new KeyBinding(ApplicationCommands.Paste, Key.V, ModifierKeys.Control));
                 _elementDataGrid.InputBindings.Add(new KeyBinding(ApplicationCommands.Open, Key.O, ModifierKeys.Control));
-                CommandManager.AddPreviewCanExecuteHandler(_elementDataGrid, OnDataGridPreviewCanExecuted);
-                CommandManager.AddPreviewExecutedHandler(_elementDataGrid, OnDataGridPreviewExecuted);
+                CommandManager.AddPreviewCanExecuteHandler(_elementDataGrid, PreviewCanExecuted);
+                CommandManager.AddPreviewExecutedHandler(_elementDataGrid, PreviewExecuted);
+
+                _elementDataGrid.PreviewMouseDoubleClick += ElementDataGridOnMouseDoubleClick;
+            }
+        }
+
+        private void ElementDataGridOnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var parent = e.OriginalSource as DependencyObject;
+            DataGridCell clickedDataCell = null;
+            do
+            {
+                if (parent == null)
+                {
+                    return;
+                }
+
+                if (parent is DataGridCell cell)
+                {
+                    clickedDataCell = cell;
+                    break;
+                }
+                parent = VisualTreeHelper.GetParent(parent);
+            } while (parent != null);
+
+            if (clickedDataCell != null)
+            {
+                if (clickedDataCell.DataContext is FolderResourceViewModel folderResource)
+                {
+                    folderResource.IsSelected = true;
+                }
+                else if (clickedDataCell.DataContext is FileResourceViewModel fileResource)
+                {
+                    Process.Start(new ProcessStartInfo { FileName = fileResource.WebLink, UseShellExecute = true });
+                }
+                e.Handled = true;
             }
         }
 
@@ -165,7 +216,7 @@ namespace CustomControlLibrary
             UnregisterCommands();
             ElementTreeView = null;
             ElementDataGrid = null;
-            
+
             _uiInited = false;
         }
 
@@ -186,13 +237,17 @@ namespace CustomControlLibrary
         {
             _commandsHelper.RegisterCommand(ApplicationCommands.Delete,
                 new CommandDescription(
-                    canExecuted: (resource, parameter) => {
-                        return Storage!=null && ResourceHelper.IsAlive(resource) && resource.Parent != null
+                    canExecuted: (resource, parameter) =>
+                    {
+                        return Storage != null && ResourceHelper.HasAliveParent(resource)
                         && Storage.IsOperationSupported(resource.IsFolder ? Operations.DeleteFolder : Operations.DeleteFile);
                     },
                     execute: (resource, parameter) =>
                     {
-                        if (MessageBox.Show($"Deleting resource: {resource.Name}?", "Delete resource", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                        if (MessageBox.Show($"Deleting resource: {resource.Name}?",
+                            "Deletion",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Question) == MessageBoxResult.Yes)
                         {
                             Storage?.Delete(resource);
                         }
@@ -201,9 +256,11 @@ namespace CustomControlLibrary
 
             _commandsHelper.RegisterCommand(ApplicationCommands.Copy,
                 new CommandDescription(
-                    canExecuted: (resource, parameter) => { return Storage != null && ResourceHelper.IsAlive(resource) 
-                        && Storage.IsOperationSupported(resource.IsFolder? Operations.CopyFolder: Operations.CopyFile)
-                        && resource.Parent != null; },
+                    canExecuted: (resource, parameter) =>
+                    {
+                        return Storage != null && ResourceHelper.HasAliveParent(resource) &&
+                        Storage.IsOperationSupported(resource.IsFolder ? Operations.CopyFolder : Operations.CopyFile);
+                    },
                     execute: (resource, parameter) => { _commandsHelper.PutBuffer(resource); }
                 ));
 
@@ -211,16 +268,14 @@ namespace CustomControlLibrary
                 new CommandDescription(
                     canExecuted: (resource, parameter) =>
                     {
-                        return Storage != null && ResourceHelper.IsAlive(resource)
-                        && Storage.IsOperationSupported(resource.IsFolder ? Operations.CutFolder : Operations.CutFile)
-                        && resource.Parent != null;
+                        return Storage != null && ResourceHelper.HasAliveParent(resource) &&
+                        Storage.IsOperationSupported(resource.IsFolder ? Operations.CutFolder : Operations.CutFile);
                     },
                     execute: (resource, parameter) =>
                     {
                         _commandsHelper.PutBuffer(resource, true);
                     }
                 ));
-
 
             Func<IResourceViewModel, IResource, IResource> GetPasteCommandTarget = (source, resource) =>
               {
@@ -276,17 +331,15 @@ namespace CustomControlLibrary
                     })
                 );
 
-
             _commandsHelper.RegisterCommand(ApplicationCommands.Open, new CommandDescription(
-                canExecuted:  (resource, parameter)=>{ 
-                    return ResourceHelper.IsAliveFolder(resource); 
+                canExecuted: (resource, parameter) =>
+                {
+                    return ResourceHelper.IsAliveFolder(resource) && Storage.IsOperationSupported(Operations.UploadFile);
                 },
-                execute: async (resource, parameter)=>{
-                    //1. get file
-                    //2. send to content to the storage
+                execute: async (resource, parameter) =>
+                {
                     OpenFileDialog openFileDialog = new OpenFileDialog();
-                   
-                    if (openFileDialog.ShowDialog() == true) 
+                    if (openFileDialog.ShowDialog() == true)
                     {
                         using var stream = openFileDialog.OpenFile();
                         // Todo find resonable way to get mime type for file
@@ -302,74 +355,66 @@ namespace CustomControlLibrary
             _commandsHelper.UnregisterCommand(ApplicationCommands.Copy);
             _commandsHelper.UnregisterCommand(ApplicationCommands.Delete);
             _commandsHelper.UnregisterCommand(ApplicationCommands.Paste);
+            _commandsHelper.UnregisterCommand(ApplicationCommands.Cut);
         }
 
-        private void OnTreeViewPreviewCanExecuted(object sender, CanExecuteRoutedEventArgs e)
+
+        private void PreviewCanExecuted(object sender, CanExecuteRoutedEventArgs e)
         {
-            if(!_commandsHelper.IsRegisteredCommand(e.Command))
+            if (!_commandsHelper.IsRegisteredCommand(e.Command))
             {
                 return;
             }
-            var resource = GetInputResource(sender, e.Parameter as string);
+
+            var resource = GetInputResource(sender, e.Command, e.Parameter as string);
             e.CanExecute = _commandsHelper.CanExecuted(e.Command, resource, e.Parameter);
             e.Handled = true;
         }
 
-        private void OnTreeViewPreviewExecuted(object sender, ExecutedRoutedEventArgs e)
+        private void PreviewExecuted(object sender, ExecutedRoutedEventArgs e)
         {
             if (!_commandsHelper.IsRegisteredCommand(e.Command))
             {
                 return;
             }
 
-            var resource = GetInputResource(sender, e.Parameter as string);
+            var resource = GetInputResource(sender, e.Command, e.Parameter as string);
             _commandsHelper.Execute(e.Command, resource, e.Parameter);
             e.Handled = true;
         }
 
-        private void OnDataGridPreviewCanExecuted(object sender, CanExecuteRoutedEventArgs e)
+        private IResource GetInputResource(object sender, ICommand command, string parameter)
         {
-            if (!_commandsHelper.IsRegisteredCommand(e.Command))
-            {
-                return;
-            }
-
-            var resource = GetInputResource(sender, e.Parameter as string);
-            e.CanExecute = _commandsHelper.CanExecuted(e.Command, resource, e.Parameter );
-            e.Handled = true;
-        }
-
-        private void OnDataGridPreviewExecuted(object sender, ExecutedRoutedEventArgs e)
-        {
-            if (!_commandsHelper.IsRegisteredCommand(e.Command))
-            {
-                return;
-            }
-
-            var resource = GetInputResource(sender, e.Parameter as string);
-            _commandsHelper.Execute(e.Command, resource, e.Parameter );
-            e.Handled = true;
-        }
-
-        private IResource GetInputResource(object sender, string parameter)
-        {
-            var treeview = sender as TreeView;
-            if (treeview != null && (parameter == null || parameter == "tree"))
+            if (sender is TreeView treeview && (parameter == null || parameter == "tree"))
             {
                 return treeview.SelectedItem as IResource;
             }
-            var dataGrid = sender as DataGrid;
-            if (dataGrid != null)
+
+            if (sender is not DataGrid dataGrid)
             {
-                if (parameter == null || parameter == "outCell")
-                {
-                    var selected = dataGrid.SelectedItem as IResource;
-                    return selected != null ? selected.Parent : _elementTreeView.SelectedItem as IResource;
-                }
-                return dataGrid.SelectedItem as IResource;
+                return null;
             }
 
-            return null;
+            var selected = dataGrid.SelectedItem as IResource;
+            // Null means that command activated through keyboard.
+            // Cell means that command activated not directly at resource view, but at area of datagrid.
+            if (parameter == null || parameter == "outCell")
+            {
+                if (command == ApplicationCommands.Open || command == ApplicationCommands.Paste)
+                {
+                    if (selected == null)
+                    {
+                        return _elementTreeView.SelectedItem as IResource;
+                    }
+
+                    return ResourceHelper.IsAliveFolder(selected) ? selected :
+                         ResourceHelper.HasAliveParentFolder(selected) ? selected.Parent : null;
+                }
+
+                return selected;
+            }
+
+            return selected;
         }
         #endregion
 
@@ -383,31 +428,14 @@ namespace CustomControlLibrary
             resource.Load();
         }
 
-        private void ElementDataGridOnSelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            //if (e.AddedItems.Count == 0)
-            //{
-            //    return;
-            //}
-
-            //if (e.AddedItems[0] is FolderResourceViewModel folder)
-            //{
-            //    folder.IsSelected = true;
-            //}
-            //else if (e.AddedItems[0] is FileResourceViewModel file)
-            //{
-            //    file.IsSelected = true;
-            //}
-        }
-
         private void AwareIsAnyResourceSelected()
         {
-            var hasSelectedResource = _elementTreeView.SelectedItem != null;
+            var hasSelectedResource = _elementTreeView?.SelectedItem != null;
             if (hasSelectedResource)
             {
                 return;
             }
-            
+
             if (Storage.Resources.Count == 0)
             {
                 Storage.Resources.CollectionChanged -= OnStorageResourcesChanged;
@@ -417,10 +445,10 @@ namespace CustomControlLibrary
 
             TrySelectRootResource();
         }
-        
+
         private void OnStorageResourcesChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            if(Storage.Resources.Count == 0)
+            if (Storage.Resources.Count == 0)
             {
                 return;
             }
@@ -442,17 +470,25 @@ namespace CustomControlLibrary
         private void SetupStorage(IStorage storage)
         {
             AwareIsAnyResourceSelected();
+            SetValue(StatusPropertyKey, $"Connected: {storage.StorageName}");
         }
 
         private void ReleaseStorage(IStorage storage)
         {
             storage.Resources.CollectionChanged -= OnStorageResourcesChanged;
-            if (_elementTreeView.SelectedItem is FolderResourceViewModel folder)
+            if (_elementTreeView?.SelectedItem is IResourceViewModel folder)
             {
                 folder.IsSelected = false;
             }
+            if (_elementDataGrid?.SelectedItem is FolderResourceViewModel resource)
+            {
+                resource.IsSelected = false;
+            }
+
+            SetValue(StatusPropertyKey, "Disconnected");
         }
 
+        #region Commands helpers
         private class CommandDescription
         {
             public CommandDescription(Func<IResource, object, bool> canExecuted, Action<IResource, object> execute)
@@ -461,7 +497,7 @@ namespace CustomControlLibrary
                 Execute = execute;
             }
 
-            public Func<IResource, object, bool> CanExecuted { get;  }
+            public Func<IResource, object, bool> CanExecuted { get; }
             public Action<IResource, object> Execute { get; }
         }
 
@@ -469,23 +505,23 @@ namespace CustomControlLibrary
         {
             private IResource _buffer;
 
-            private Dictionary<ICommand, CommandDescription> _commands = new();
+            private readonly Dictionary<ICommand, CommandDescription> _commands = new();
             public void RegisterCommand(ICommand command, CommandDescription description)
             {
                 _commands[command] = description;
             }
-            
+
             public void UnregisterCommand(ICommand command)
             {
                 _commands.Remove(command);
             }
-            
-            public bool CanExecuted (ICommand command, IResource resource, object parameter)
+
+            public bool CanExecuted(ICommand command, IResource resource, object parameter)
             {
                 return _commands.ContainsKey(command) && _commands[command].CanExecuted.Invoke(resource, parameter);
-            } 
-            
-            public void Execute (ICommand command, IResource resource, object parameter)
+            }
+
+            public void Execute(ICommand command, IResource resource, object parameter)
             {
                 _commands[command].Execute.Invoke(resource, parameter);
             }
@@ -494,7 +530,7 @@ namespace CustomControlLibrary
 
             internal void ClearBuffer()
             {
-                if(_buffer is IResourceViewModel view)
+                if (_buffer is IResourceViewModel view)
                 {
                     view.IsCutted = false;
                 }
@@ -520,6 +556,8 @@ namespace CustomControlLibrary
                 return _buffer;
             }
         }
+
+        #endregion
 
     }
 }

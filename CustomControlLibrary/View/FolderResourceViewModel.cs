@@ -5,30 +5,47 @@ using System.Threading.Tasks;
 
 namespace CustomControlLibrary
 {
-
+    /// <summary>
+    /// Represent folder resource view.
+    /// </summary>
     public class FolderResourceViewModel : FolderResource, IResourceViewModel
     {
+        private bool _isCutted;
+
+        ///<inheritdoc/>
+        public bool IsCutted
+        {
+            get => _isCutted; set { Set(ref _isCutted, value); }
+        }
+
+
         private bool _isSelected;
 
-        public override async Task Load()
+        ///<inheritdoc/>
+        public bool IsSelected
         {
-            if(IsLoaded|| IsLoading)
-            {
-                return;
-            }
-            await base.Load();
+            get => _isSelected; set { Set(ref _isSelected, value); }
+        }
 
+        private ObservableCollection<IResource> _folders = new();
+
+        /// <summary>
+        /// List of folders.
+        /// </summary>
+        public ObservableCollection<IResource> Folders
+        {
+            get => _folders; set => Set(ref _folders, value);
+        }
+
+        protected override async Task LoadInternal()
+        {
+            await base.LoadInternal();
+            
             CreateFolderList();
+            Resources.CollectionChanged -= Resources_CollectionChanged;
             Resources.CollectionChanged += Resources_CollectionChanged;
         }
-
-        //public BitmapSource IconBitmap { get; set; }
-        public override void Dispose()
-        {
-            Resources.CollectionChanged -= Resources_CollectionChanged;
-            base.Dispose();
-        }
-
+        
         private void Resources_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Remove)
@@ -54,21 +71,9 @@ namespace CustomControlLibrary
             }
         }
 
-        public bool IsSelected
-        {
-            get => _isSelected; set { Set(ref _isSelected, value); }
-        }
-
-        private ObservableCollection<IResource> _folders = new();
-
-        public ObservableCollection<IResource> Folders
-        {
-            get => _folders;
-            set => Set(ref _folders, value);
-        }
-
         private void CreateFolderList()
         {
+            Folders.Clear();
             foreach (var r in Resources)
             {
                 if (r.IsFolder)
@@ -78,32 +83,10 @@ namespace CustomControlLibrary
             }
         }
         
-        private bool _isCutted;
-        public bool IsCutted
+        public override void Dispose()
         {
-            get => _isCutted; set { Set(ref _isCutted, value); }
+            Resources.CollectionChanged -= Resources_CollectionChanged;
+            base.Dispose();
         }
-    }
-
-
-    public class FileResourceViewModel : FileResource, IResourceViewModel
-    {
-        private bool _isSelected;
-        public bool IsSelected
-        {
-            get => _isSelected; set { Set(ref _isSelected, value); }
-        }   
-        
-        private bool _isCutted;
-        public bool IsCutted
-        {
-            get => _isCutted; set { Set(ref _isCutted, value); }
-        }
-    }
-
-    public interface IResourceViewModel: IResource
-    {
-        bool IsSelected { get; set; }
-        bool IsCutted { get; set; }
     }
 }

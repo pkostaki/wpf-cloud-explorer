@@ -137,7 +137,7 @@ namespace StorageLib.OneDrive
                 try
                 {
                     var root = await _graphServiceClient.Me.Drive.Root.Request()
-                    .Select("id,name,folder,file,parentReference")
+                    .Select("id,name,folder,file,parentReference,WebUrl,size,lastModifiedDateTime,folder")
                     .Expand("thumbnails")
                     .GetAsync();
                     _driveId = root.ParentReference?.DriveId;
@@ -170,7 +170,7 @@ namespace StorageLib.OneDrive
                     await _initialization.Task;
 
                     var driveItem = await _graphServiceClient.Me.Drive.Items[id].Request()
-                        .Select("id,name,size,file,parentReference,lastModifiedDateTime,folder")
+                        .Select("id,name,size,file,parentReference,lastModifiedDateTime,folder,WebUrl")
                         .Expand("thumbnails")
                         .GetAsync();
 
@@ -197,7 +197,7 @@ namespace StorageLib.OneDrive
                 {
                     var resources = new ObservableCollection<IResource>();
                     var request = _graphServiceClient.Me.Drive.Items[folderId].Children.Request()
-                        .Select("id,name,size,file,parentReference,lastModifiedDateTime,folder,thumbnails")
+                        .Select("id,name,size,file,parentReference,lastModifiedDateTime,folder,thumbnails,WebUrl")
                         .Expand("thumbnails");
                     do
                     {
@@ -347,10 +347,22 @@ namespace StorageLib.OneDrive
                 item.LastModifiedDateTime.HasValue ? item.LastModifiedDateTime.Value.DateTime : null,
                 item.Name,
                 item.Size,
-                item.File?.MimeType);
+                item.File?.MimeType,
+                item.WebUrl);
         }
 
-        private Operations _supportedOperations = Operations.CopyFile | Operations.CopyFolder| Operations.DeleteFile | Operations.DeleteFolder | Operations.CutFile | Operations.CutFolder;
+        private Operations _supportedOperations =
+                                                Operations.CopyFile |
+                                                Operations.CopyFolder |
+                                                Operations.DeleteFile |
+                                                Operations.DeleteFolder |
+                                                Operations.CutFile |
+                                                Operations.CutFolder |
+                                                Operations.UploadFile;
+
+        ///<inheritdoc/>
+        public string CloudStorageName => "OneDrive";
+
         public bool IsOperationSupported(Operations operation)
         {
             return (operation & _supportedOperations) == operation;

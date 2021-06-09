@@ -9,6 +9,7 @@ namespace StorageLib.CloudStorage.Api
     {
         bool IsFolder { get; }
 
+        string WebLink { get; }
         string IconLink { get; }
         string Id { get; }
 

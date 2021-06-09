@@ -11,6 +11,7 @@ namespace StorageLib.CloudStorage.Api
             DateTime? modifiedTime,
             string name,
             long? size,
-            string mimeType);
+            string mimeType,
+            string webLink);
     }
 }

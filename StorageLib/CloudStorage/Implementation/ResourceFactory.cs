@@ -14,7 +14,9 @@ namespace StorageLib.CloudStorage.Implementation
             DateTime? modifiedTime,
             string name,
             long? size,
-            string mimeType)
+            string mimeType,
+            string webViewLink
+            )
         {
             Resource resource = isFolder ? new T() : new K();
             resource.Api = api;
@@ -24,6 +26,7 @@ namespace StorageLib.CloudStorage.Implementation
             resource.Name = name;
             resource.Size = size;
             resource.MimeType = mimeType;
+            resource.WebLink = webViewLink;
             return resource;
         }
     }
