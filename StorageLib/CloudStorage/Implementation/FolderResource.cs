@@ -43,7 +43,7 @@ namespace StorageLib.CloudStorage.Implementation
             if (result.Status == ResutlStatus.Succeed)
             {
                 var nestedResources = result.Result;
-                foreach (var nested in nestedResources)
+                foreach (Resource nested in nestedResources)
                 {
                     nested.Parent = this;
                     nested.ParentId = this.Id;

@@ -114,6 +114,7 @@ namespace StorageLib.CloudStorage.Implementation
                 resource.Dispose();
             }
             Resources.Clear();
+            Resources = null;
             IsDestroyed = true;
             Parent = null;
         }

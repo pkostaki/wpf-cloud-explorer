@@ -68,12 +68,12 @@ namespace StorageLib.CloudStorage.Api
         /// <summary>
         /// Parent id.
         /// </summary>
-        string ParentId { get; set; } // todo remove setter
+        string ParentId { get;}
 
         /// <summary>
         /// Parent link
         /// </summary>
-        IResource Parent { get; set; } //todo remove setter
+        IResource Parent { get;} 
 
         /// <summary>
         /// True if resource was loaded.

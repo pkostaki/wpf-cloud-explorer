@@ -436,7 +436,7 @@ namespace CustomControlLibrary
                 return;
             }
 
-            Task.Run(()=> resource.Load());
+            resource.Load();
         }
 
         private void AwareIsAnyResourceSelected()

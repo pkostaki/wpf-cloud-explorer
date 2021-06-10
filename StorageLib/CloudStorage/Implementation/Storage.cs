@@ -69,7 +69,7 @@ namespace StorageLib.CloudStorage.Implementation
             var result = await _api.Move(resource.Id, resource.Parent?.Id, target.Id);
             if (result.Status == ResutlStatus.Succeed)
             {
-                var newResource = result.Result;
+                var newResource = (Resource)result.Result;
                 target.Resources.Add(newResource);
                 newResource.Parent = target;
                 newResource.ParentId = target.Id;
@@ -100,7 +100,7 @@ namespace StorageLib.CloudStorage.Implementation
             var result = await _api.Copy(resource.Id, target.Id);
             if (result.Status == ResutlStatus.Succeed)
             {
-                var newResource = result.Result;
+                var newResource = (Resource)result.Result;
                 newResource.Parent = target;
                 newResource.ParentId = target.Id;
                 target.Resources.Add(newResource);
@@ -157,7 +157,7 @@ namespace StorageLib.CloudStorage.Implementation
             var result =  await _api.Upload(fileName, target.Id, stream, contentType);
             if(result.Status == ResutlStatus.Succeed)
             {
-                var newResource = result.Result;
+                var newResource = (Resource)result.Result;
                 newResource.Parent = target;
                 newResource.ParentId = target.Id;
                 target.Resources.Add(result.Result);

@@ -28,7 +28,7 @@ namespace StorageTest
                 new OperationResult<IResource>()
                 {
                     Status = resutlStatus,
-                    Result = _resourceFactory.Create(_api, true, "root", null, null, "root", null, null)
+                    Result = _resourceFactory.Create(_api, true, "root", null, null, "root", null, null, null)
                 });
             var storage = new Storage(_api);
             await storage.Initialize();
@@ -41,16 +41,16 @@ namespace StorageTest
         private async Task<Storage> CreateStorageInstance()
         {
             var nestedNodes = new ObservableCollection<IResource> {
-                    _resourceFactory.Create(_api, false,"subnode1", null,null,"subnode1",null,null),
-                    _resourceFactory.Create(_api, false,"subnode2", null,null,"subnode2",null,null),
-                    _resourceFactory.Create(_api, true,"subnode3", null,null,"subnode3",null,null)
+                    _resourceFactory.Create(_api, false,"subnode1", null,null,"subnode1",null,null, null),
+                    _resourceFactory.Create(_api, false,"subnode2", null,null,"subnode2",null,null, null),
+                    _resourceFactory.Create(_api, true,"subnode3", null,null,"subnode3",null,null, null)
                 };
 
             _api.SetExpectedResult(
                 new OperationResult<IResource>()
                 {
                     Status = ResutlStatus.Succeed,
-                    Result = _resourceFactory.Create(_api, true, "root", null, null, "root", null, null)
+                    Result = _resourceFactory.Create(_api, true, "root", null, null, "root", null, null, null)
                 });
 
             _api.NestendResourceOperationResult = new OperationResult<ObservableCollection<IResource>>
@@ -82,7 +82,7 @@ namespace StorageTest
                 Result = expectedStatus==ResutlStatus.Failed?null: _resourceFactory.Create(_api,
                     source.IsFolder,
                     source.Id,
-                    null, null, "copied", null, null)
+                    null, null, "copied", null, null, null)
             };
 
             Assert.IsTrue(storage.Resources.Count == 1, "Unexpected situation.");
@@ -142,7 +142,7 @@ namespace StorageTest
                 Result = expectedStatus == ResutlStatus.Failed ? null : _resourceFactory.Create(_api,
                             source.IsFolder,
                             source.Id,
-                            null, null, "moved", null, null)
+                            null, null, "moved", null, null,null)
             };
 
             Assert.IsTrue(storage.Resources.Count == 1, "Unexpected situation.");
@@ -269,6 +269,8 @@ namespace StorageTest
 
 
         public OperationResult<IResource> MoveResult { get; set; }
+
+        public string CloudStorageName => throw new System.NotImplementedException();
 
         public Task<OperationResult<IResource>> Move(string id, string parentId, string targetId)
         {
