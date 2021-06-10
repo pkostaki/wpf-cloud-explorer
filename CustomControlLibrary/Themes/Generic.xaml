@@ -31,7 +31,7 @@
                                     <DataTrigger.Value>
                                         <sys:Boolean>false</sys:Boolean>
                                     </DataTrigger.Value>
-                                    <Setter TargetName="Text" Property="Opacity" Value="0.5" />
+                                    <Setter TargetName="Text" Property="Opacity" Value="0.7" />
                                 </DataTrigger>
 
                                 <DataTrigger Binding="{Binding IsLoading}">

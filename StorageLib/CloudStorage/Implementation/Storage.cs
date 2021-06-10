@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace StorageLib.CloudStorage.Implementation
 {
+    ///<inheritdoc/>
     public sealed class Storage : IStorage
     {
         private readonly ICloudStorageApi _api;
@@ -13,45 +14,67 @@ namespace StorageLib.CloudStorage.Implementation
         public ObservableCollection<IResource> Resources { get; private set; } = new();
         
         ///<inheritdoc/>
-        public string StorageName => _api.CloudStorageName;
+        public string CloudStorageName => _api.CloudStorageName;
 
         private readonly TaskCompletionSource<bool> _initializatoin = new();
 
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="api">Cloud api <see cref="ICloudStorageApi"/></param>
         public Storage(ICloudStorageApi api)
         {
             _api = api;
         }
 
+        ///<inheritdoc/>
+        public Task<bool> Initialized { get => _initializatoin.Task; }
+
+        /// <summary>
+        /// Initialize storage.
+        /// </summary>
+        /// <returns>Task</returns>
         public async Task Initialize()
         {
             var result = await _api.GetRoot();
-            if(result.Status==ResutlStatus.Failed)
+            if (result.Status == ResutlStatus.Failed) 
             {
+                _initializatoin.TrySetResult(false);
                 return;
             }
+            
             var resource = result.Result;
             Resources.Add(resource);
             await resource.Load();
             _initializatoin.TrySetResult(true);
         }
 
-        public async Task<OperationResult<IResource>> Move(IResource resource, IResource folderTo)
+        ///<inheritdoc/>
+        public async Task<OperationResult<IResource>> Move(IResource resource, IResource target)
         {
-            if (resource.IsDestroyed || folderTo.IsDestroyed)
+            if(await _initializatoin.Task == false)
             {
-                throw new InvalidOperationException("Resource was destroyed previously.");
+                return OperationResult<IResource>.FailedWithNotInitializeResult();
             }
-            await _initializatoin.Task;
-            var movedPreviousParent = resource.Parent;
-            var result = await _api.Move(resource.Id, resource.Parent?.Id, folderTo.Id);
+            if (resource.IsDestroyed || target.IsDestroyed)
+            {
+                throw new ArgumentException("Resource was destroyed previously.");
+            }
+            if (!IsOperationSupported(resource.IsFolder ? Operations.CutFolder : Operations.CutFile))
+            {
+                throw new ArgumentException("Unsupported operation on resource.");
+            }
+
+            var previousParent = resource.Parent;
+            var result = await _api.Move(resource.Id, resource.Parent?.Id, target.Id);
             if (result.Status == ResutlStatus.Succeed)
             {
                 var newResource = result.Result;
-                folderTo.Resources.Add(newResource);
-                newResource.Parent = folderTo;
-                newResource.ParentId = folderTo.Id;
+                target.Resources.Add(newResource);
+                newResource.Parent = target;
+                newResource.ParentId = target.Id;
 
-                movedPreviousParent?.Resources?.Remove(resource);
+                previousParent?.Resources?.Remove(resource);
                 resource.Dispose();
             }
 
@@ -59,42 +82,51 @@ namespace StorageLib.CloudStorage.Implementation
         }
 
         ///<inheritdoc/>
-        public async Task<OperationResult<IResource>> Copy(IResource resource, IResource folderTo)
+        public async Task<OperationResult<IResource>> Copy(IResource resource, IResource target)
         {
-            // 1. check that resources are properly
-            // 2. create resource copy with storage api
-            // 3. update resource's collection
-            if (resource.IsDestroyed || folderTo.IsDestroyed)
+            if (await _initializatoin.Task == false)
             {
-                throw new InvalidOperationException("Resource was destroyed previously.");
+                return OperationResult<IResource>.FailedWithNotInitializeResult();
             }
-            if (resource.IsFolder && !_api.IsOperationSupported(Operations.CopyFolder))
+            if (resource.IsDestroyed || target.IsDestroyed)
             {
-                throw new ArgumentException($"Parameter {nameof(resource)} must be a single file resource.");
+                throw new ArgumentException("Resource was destroyed previously.");
             }
-            if (!folderTo.IsFolder)
+            if (!IsOperationSupported(resource.IsFolder ? Operations.CopyFolder : Operations.CopyFile))
             {
-                throw new ArgumentException($"Parameter {nameof(folderTo)} must be a folder resource.");
+                throw new ArgumentException("Unsupported operation on resource.");
             }
-            await _initializatoin.Task;
-
-            var result = await _api.Copy(resource.Id, folderTo.Id);
+          
+            var result = await _api.Copy(resource.Id, target.Id);
             if (result.Status == ResutlStatus.Succeed)
             {
                 var newResource = result.Result;
-                newResource.Parent = folderTo;
-                newResource.ParentId = folderTo.Id;
-                folderTo.Resources.Add(result.Result);
+                newResource.Parent = target;
+                newResource.ParentId = target.Id;
+                target.Resources.Add(newResource);
             }
             return result;
         }
 
+        ///<inheritdoc/>
         public async Task<OperationResult<bool>> Delete(IResource resource)
         {
-            await _initializatoin.Task;
+            if (await _initializatoin.Task == false)
+            {
+                return OperationResult<bool>.FailedWithNotInitializeResult();
+            }
+
+            if (resource.IsDestroyed)
+            {
+                throw new ArgumentException("Resource was destroyed previously.");
+            }
+
+            if (!IsOperationSupported(resource.IsFolder ? Operations.DeleteFolder : Operations.DeleteFile))
+            {
+                throw new ArgumentException("Unsupported operation on resource.");
+            }
 
             var result = await _api.Delete(resource.Id);
-
             if (result.Status == ResutlStatus.Succeed)
             {
                 var parent = resource.Parent;
@@ -103,28 +135,62 @@ namespace StorageLib.CloudStorage.Implementation
             }
             return result;
         }
-
-        public async Task<OperationResult<IResource>> Upload(string fileName, IResource parent, Stream stream, string contentType)
+        
+        ///<inheritdoc/>
+        public async Task<OperationResult<IResource>> Upload( IResource target, string fileName, Stream stream, string contentType)
         {
-            var result =  await _api.Upload(fileName, parent.Id, stream, contentType);
+            if (await _initializatoin.Task == false)
+            {
+                return OperationResult<IResource>.FailedWithNotInitializeResult();
+            }
+
+            if (target.IsDestroyed)
+            {
+                throw new ArgumentException("Resource was destroyed previously.");
+            }
+
+            if (!IsOperationSupported(Operations.UploadFile))
+            {
+                throw new ArgumentException("Unsupported operation.");
+            }
+
+            var result =  await _api.Upload(fileName, target.Id, stream, contentType);
             if(result.Status == ResutlStatus.Succeed)
             {
-                parent.Resources.Add(result.Result);
+                var newResource = result.Result;
+                newResource.Parent = target;
+                newResource.ParentId = target.Id;
+                target.Resources.Add(result.Result);
             }
 
             return result;
         }
 
+        ///<inheritdoc/>
         public async Task<IResource> Find(Predicate<IResource> match )
         {
-            await _initializatoin.Task;
+            if (await _initializatoin.Task == false)
+            {
+                return null;
+            }
+
             return Find(Resources, match);
-        }      
+        }   
         
+        ///<inheritdoc/>
         public async Task<IResource> Find(Predicate<IResource> match, IResource start )
         {
-            await _initializatoin.Task;
-            if(match.Invoke(start))
+            if (await _initializatoin.Task == false)
+            {
+                return null;
+            }
+
+            if (start.IsDestroyed)
+            {
+                throw new ArgumentException("Resource was destroyed previously.");
+            }
+
+            if (match.Invoke(start))
             {
                 return start;
             }
@@ -149,23 +215,25 @@ namespace StorageLib.CloudStorage.Implementation
             return null;
         }
 
+        ///<inheritdoc/>
         public Task Load(IResource resource)
         {
             return resource.Load();
         }
 
-
+        ///<inheritdoc/>
         public bool IsOperationSupported(Operations operation)
         {
             return _api.IsOperationSupported(operation);
         }
-        
+
+        ///<inheritdoc/>
         public Task SignOut()
         {
-            return  _api?.SignOut(); 
+            return  _api.SignOut(); 
         }
 
-
+        ///<inheritdoc/>
         public void Dispose()
         {
             if (Resources != null)
@@ -176,7 +244,7 @@ namespace StorageLib.CloudStorage.Implementation
                 }
                 Resources.Clear();
             }
-            
+            Resources = null;
             _api?.Dispose();
         }
     }

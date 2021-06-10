@@ -19,7 +19,6 @@ namespace wpf_cloud_explorer
         public MainWindow()
         {
             InitializeComponent();
-            
         }
 
         public Visibility ForgetVisibility
@@ -58,9 +57,8 @@ namespace wpf_cloud_explorer
             }
         }
 
-
-
         private string _lastUsedProviderId;
+
         private async void OnChangeProvider(object sender, RoutedEventArgs e)
         {
             var button = (sender as ToggleButton);
@@ -114,9 +112,10 @@ namespace wpf_cloud_explorer
         private async Task<IStorage> SetupOneDriveStorage()
         {
             var resourceFactory = new ResourceFactory<FolderResourceViewModel, FileResourceViewModel>();
-            var api = new OneDriveApi("234cd3b6-6dd1-42da-8658-b06ae5834feb", resourceFactory);
+            const string azureCloudInstance = "https://login.microsoftonline.com/";
+            var api = new OneDriveApi("234cd3b6-6dd1-42da-8658-b06ae5834feb", azureCloudInstance, "common", resourceFactory);
             var storage = new Storage(api);
-            await storage.Initialize();
+            await Task.Run(()=>storage.Initialize());
             return storage;
         }
 
@@ -125,7 +124,7 @@ namespace wpf_cloud_explorer
             var resourceFactory = new ResourceFactory<FolderResourceViewModel, FileResourceViewModel>();
             var api = new GoogleDriveApi("credentials.json", "Cloud explorer", resourceFactory);
             var storage = new Storage(api);
-            await storage.Initialize();
+            await Task.Run(() => storage.Initialize());
             return storage;
         }
     }

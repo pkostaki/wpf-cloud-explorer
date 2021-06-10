@@ -14,13 +14,18 @@ using System.Threading.Tasks;
 
 namespace StorageLib.OneDrive
 {
+    /// <summary>
+    /// Implements OneDrive resource operations.
+    /// </summary>
     public sealed class OneDriveApi : ICloudStorageApi
     {
         private readonly string[] _scopes = new string[] { "user.read", "files.readwrite", "offline_access"};
 
         private IPublicClientApplication _clientApp;
-        private readonly TaskCompletionSource _initialization = new();
+        private readonly TaskCompletionSource<bool> _initialization = new();
         private readonly string _clientId;
+        private readonly string _tenant;
+        private readonly string _azureCloudInstance;
         private readonly IResourceFactory _resourceFactory;
         private string _driveId;
 
@@ -28,13 +33,17 @@ namespace StorageLib.OneDrive
         /// Constructor.
         /// </summary>
         /// <param name="clientId">Application client id.</param>
-        /// <param name="resourceFactory">Resource factory.</param>
-        public OneDriveApi(string clientId, IResourceFactory resourceFactory)
+        /// <param name="azureCloudInstance">Authority Uri parameter</param>
+        /// <param name="tenant">Authority Uri parameter</param>
+        /// <param name="resourceFactory">Resource creation factory.</param>
+        public OneDriveApi(string clientId, string azureCloudInstance, string tenant, IResourceFactory resourceFactory)
         {
             _clientId = clientId;
+            _tenant = tenant;
+            _azureCloudInstance = azureCloudInstance;
             _resourceFactory = resourceFactory;
 
-            InitializeAsync();
+            _ = InitializeAsync();
         }
 
         #region Authentication
@@ -43,298 +52,298 @@ namespace StorageLib.OneDrive
 
         private GraphServiceClient _graphServiceClient;
 
+        private async Task InitializeAsync()
+        {
+
+            CreateApplication();
+
+            // https://docs.microsoft.com/en-us/azure/active-directory/develop/msal-acquire-cache-tokens
+            IAccount firstAccount;
+            var accounts = await _clientApp.GetAccountsAsync();
+            firstAccount = accounts.FirstOrDefault();
+            try
+            {
+                _authResult = await _clientApp.AcquireTokenSilent(_scopes, firstAccount)
+                    .ExecuteAsync();
+            }
+            catch (MsalUiRequiredException ex)
+            {
+                // A MsalUiRequiredException happened on AcquireTokenSilent. 
+                // This indicates you need to call AcquireTokenInteractive to acquire a token
+                Debug.WriteLine($"MsalUiRequiredException: {ex.Message}");
+                try
+                {
+                    _authResult = await _clientApp.AcquireTokenInteractive(_scopes)
+                        .WithAccount(firstAccount)
+                        .WithPrompt(Microsoft.Identity.Client.Prompt.SelectAccount)
+                        .ExecuteAsync();
+                }
+                catch (MsalException msalex)
+                {
+                    // Error Acquiring Token:{System.Environment.NewLine}{msalex};
+                }
+            }
+            catch (Exception ex)
+            {
+                // Error Acquiring Token Silently:{System.Environment.NewLine}{ex}";
+                _initialization.TrySetResult(false);
+                return;
+            }
+
+            _graphServiceClient = new GraphServiceClient(new DelegateAuthenticationProvider((requestMessage) =>
+            {
+                requestMessage.Headers.Authorization
+                    = new AuthenticationHeaderValue("Bearer", _authResult.AccessToken);
+                return Task.CompletedTask;
+            }));
+
+            _initialization.TrySetResult(true);
+        }
+
         private void CreateApplication()
         {
-            const string tenant = "common";
-            const string azureCloudInstance = "https://login.microsoftonline.com/";
-
             var builder = PublicClientApplicationBuilder.Create(_clientId)
-                    .WithAuthority($"{azureCloudInstance}{tenant}")
+                    .WithAuthority($"{_azureCloudInstance}{_tenant}")
                     .WithDefaultRedirectUri();
             _clientApp = builder.Build();
             TokenCacheHelper.EnableSerialization(_clientApp.UserTokenCache);
         }
-
-        private Task InitializeAsync()
-        {
-            return Task.Run(async () =>
-            {
-                CreateApplication();
-                // https://docs.microsoft.com/en-us/azure/active-directory/develop/msal-acquire-cache-tokens
-
-                IAccount firstAccount;
-                var accounts = await _clientApp.GetAccountsAsync();
-                firstAccount = accounts.FirstOrDefault();
-                try
-                {
-                    _authResult = await _clientApp.AcquireTokenSilent(_scopes, firstAccount)
-                        .ExecuteAsync();
-                }
-                catch (MsalUiRequiredException ex)
-                {
-                    // A MsalUiRequiredException happened on AcquireTokenSilent. 
-                    // This indicates you need to call AcquireTokenInteractive to acquire a token
-                    Debug.WriteLine($"MsalUiRequiredException: {ex.Message}");
-                    try
-                    {
-                        _authResult = await _clientApp.AcquireTokenInteractive(_scopes)
-                            .WithAccount(firstAccount)
-                            .WithPrompt(Microsoft.Identity.Client.Prompt.SelectAccount)
-                            .ExecuteAsync();
-                    }
-                    catch (MsalException msalex)
-                    {
-                        // Error Acquiring Token:{System.Environment.NewLine}{msalex};
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Error Acquiring Token Silently:{System.Environment.NewLine}{ex}";
-                    return;
-                }
-
-                _graphServiceClient = new GraphServiceClient(new DelegateAuthenticationProvider((requestMessage) =>
-                {
-                    requestMessage
-                        .Headers
-                        .Authorization = new AuthenticationHeaderValue("Bearer", _authResult.AccessToken);
-                    return Task.CompletedTask;
-                }));
-
-                _initialization.TrySetResult();
-            });
-        }
-
         #endregion  
 
-        public Task<OperationResult< bool>> Delete(string id)
+        ///<inheritdoc/>
+        public async Task<OperationResult<bool>> Delete(string id)
         {
-            return Task.Run(async ()=> {
-                await _initialization.Task;
-                var result = new OperationResult<bool>();
-                try
-                {
-                    await _graphServiceClient.Me.Drive.Items[id].Request().DeleteAsync();
-                    result.Result = true;
-                    result.Status = ResutlStatus.Succeed;
-                }
-                catch ( Exception ex)
-                {
-                    result.FailedWithException(ex);
-                }
-                return result;
-            });
+            if(await _initialization.Task == false)
+            {
+                return OperationResult<bool>.FailedWithNotInitializeResult();
+            }
+
+            var result = new OperationResult<bool>();
+            try
+            {
+                await _graphServiceClient.Me.Drive.Items[id].Request().DeleteAsync();
+                result.Result = true;
+                result.Status = ResutlStatus.Succeed;
+            }
+            catch ( Exception ex)
+            {
+                result.FailedWithException(ex);
+            }
+
+            return result;
         }
 
         /// <inheritdoc/>
-        public Task<OperationResult<IResource>> GetRoot()
+        public async Task<OperationResult<IResource>> GetRoot()
         {
-            return Task.Run(async () =>
+            if (await _initialization.Task == false)
             {
-                await _initialization.Task;
-                var result = new OperationResult<IResource> ();
+                return OperationResult<IResource>.FailedWithNotInitializeResult();
+            }
 
-                try
-                {
-                    var root = await _graphServiceClient.Me.Drive.Root.Request()
-                    .Select("id,name,folder,file,parentReference,WebUrl,size,lastModifiedDateTime,folder")
+            var result = new OperationResult<IResource>();
+            try
+            {
+                var root = await _graphServiceClient.Me.Drive.Root.Request()
+                .Select("id,name,folder,file,parentReference,WebUrl,size,lastModifiedDateTime,folder")
+                .Expand("thumbnails")
+                .GetAsync();
+                _driveId = root.ParentReference?.DriveId;
+                var resource = CreateResourceInternal(root);
+                result.SucceedWithResult(resource);
+            }
+            catch (Exception ex)
+            {
+                result.FailedWithException(ex);
+            }
+
+            return result;
+        }
+
+        ///<inheritdoc/>
+        public async Task<OperationResult<IResource>> Get(string id)
+        {
+            if (await _initialization.Task == false)
+            {
+                return OperationResult<IResource>.FailedWithNotInitializeResult();
+            }
+
+            var result = new OperationResult<IResource>();
+
+            try
+            {
+                var driveItem = await _graphServiceClient.Me.Drive.Items[id].Request()
+                    .Select("id,name,size,file,parentReference,lastModifiedDateTime,folder,WebUrl")
                     .Expand("thumbnails")
                     .GetAsync();
-                    _driveId = root.ParentReference?.DriveId;
-                    var resource = CreateResourceInternal(root);
-                    result.SucceedWithResult(resource);
-                }
-                catch(Exception ex)
-                {
-                    result.FailedWithException(ex);
-                }
-                return result;
-            });
+
+                var resource = CreateResourceInternal(driveItem);
+                result.SucceedWithResult(resource);
+            }
+            catch (Exception ex)
+            {
+                result.FailedWithException(ex);
+            }
+
+            return result;
         }
 
-        public Task<OperationResult<IResource>> Get(string id)
+        ///<inheritdoc/>
+        public async Task<OperationResult<ObservableCollection<IResource>>> GetNestedResources(string resourceId)
         {
-            return Task.Run(async () =>
+            if (await _initialization.Task == false)
             {
-                // folder: Folder metadata, if the item is a folder. Read-only.
-                // id: The unique identifier of the item within the Drive. Read-only.
-                // lastModifiedDateTime: Date and time the item was last modified. Read-only.
-                // name: The name of the item (filename and extension). Read-write.
-                // parentReference: https://docs.microsoft.com/en-us/onedrive/developer/rest-api/resources/itemreference?view=odsp-graph-online
-                // size: Size of the item in bytes. Read-only.
-                // file: https://docs.microsoft.com/en-us/onedrive/developer/rest-api/resources/file?view=odsp-graph-online
+                return OperationResult<ObservableCollection<IResource>>.FailedWithNotInitializeResult();
+            }
 
-                var result = new OperationResult<IResource>();
-                try
-                {
-                    await _initialization.Task;
+            var result = new OperationResult<ObservableCollection<IResource>>();
 
-                    var driveItem = await _graphServiceClient.Me.Drive.Items[id].Request()
-                        .Select("id,name,size,file,parentReference,lastModifiedDateTime,folder,WebUrl")
-                        .Expand("thumbnails")
-                        .GetAsync();
-
-                    var resource = CreateResourceInternal(driveItem);
-                    result.SucceedWithResult(resource);
-                }
-                catch (Exception ex)
-                {
-                    result.FailedWithException(ex);
-                }
-                return result;
-            });
-       
-        }
-
-        public Task<OperationResult<ObservableCollection<IResource>>> GetNestedResources(string folderId)
-        {
-            return Task.Run(async () =>
+            try
             {
-                await _initialization.Task;
-                var result = new OperationResult<ObservableCollection<IResource>>();
-                
-                try
+                var resources = new ObservableCollection<IResource>();
+                var request = _graphServiceClient.Me.Drive.Items[resourceId].Children.Request()
+                    .Select("id,name,size,file,parentReference,lastModifiedDateTime,folder,WebUrl")
+                    .Expand("thumbnails");
+                do
                 {
-                    var resources = new ObservableCollection<IResource>();
-                    var request = _graphServiceClient.Me.Drive.Items[folderId].Children.Request()
-                        .Select("id,name,size,file,parentReference,lastModifiedDateTime,folder,thumbnails,WebUrl")
-                        .Expand("thumbnails");
-                    do
+                    var childCollection = await request.GetAsync();
+                    foreach (var driveItem in childCollection)
                     {
-                        var childCollection = await request.GetAsync();
-                        foreach (var driveItem in childCollection)
-                        {
-                            var resource = CreateResourceInternal(driveItem);
-                            resources.Add(resource);
-                        }
-                        request = childCollection.NextPageRequest;
-                    } while (request != null);
-                    result.Result = resources;
-                    result.Status = ResutlStatus.Succeed;
-                }
-                catch (ServiceException ex)
-                {
-                    result.FailedWithException(ex);
-                }
+                        var resource = CreateResourceInternal(driveItem);
+                        resources.Add(resource);
+                    }
+                    request = childCollection.NextPageRequest;
+                } while (request != null);
 
-                return result;
-            });
+                result.Result = resources;
+                result.Status = ResutlStatus.Succeed;
+            }
+            catch (ServiceException ex)
+            {
+                result.FailedWithException(ex);
+            }
+
+            return result;
         }
 
-        public Task<OperationResult<IResource>> Move(string id, string parentId, string targetId)
+        ///<inheritdoc/>
+        public async Task<OperationResult<IResource>> Move(string id, string parentId, string targetId)
         {
-            // parentId - doesn't used for OneDriveApi
-            return Task.Run(async ()=>
+            // parentId - not used for OneDriveApi
+            if (await _initialization.Task == false)
             {
-                await _initialization.Task;
-                var result = new OperationResult<IResource>();
+                return OperationResult<IResource>.FailedWithNotInitializeResult();
+            }
 
+            var result = new OperationResult<IResource>();
+
+            try
+            {
                 DriveItem item = new()
                 {
-                    ParentReference = new ItemReference { 
+                    ParentReference = new ItemReference
+                    {
                         Id = targetId,
                         DriveId = _driveId
                     }
                 };
-
-                try
+                var request = await _graphServiceClient.Me.Drive.Items[id].Request().UpdateAsync(item);
+                if (request != null)
                 {
-                    var request = await _graphServiceClient.Me.Drive.Items[id].Request().UpdateAsync(item);
-                    if (request != null)
-                    {
-                        var getUpdatedResult = await Get(request.Id);
-                        result.CompleteAsResult(getUpdatedResult);
-                    }
+                    var getUpdatedResult = await Get(request.Id);
+                    result.CompleteWithResult(getUpdatedResult);
                 }
-                catch (ServiceException ex)
-                {
-                    result.FailedWithException(ex);
-                }
+            }
+            catch (ServiceException ex)
+            {
+                result.FailedWithException(ex);
+            }
 
-                return result;
-            });
+            return result;
         }
 
-        public Task<OperationResult< IResource>> Copy(string id, string targetId)
+        ///<inheritdoc/>
+        public async Task<OperationResult<IResource>> Copy(string id, string targetId)
         {
             // 1. Wait initialization
             // 2. Form and execute copy request
             // 3. Wait while copying will completed
             // 4. If copying successed make request to fetch new item and return resource
             // 5. If failed return null 
-            return Task.Run(async () =>
+            if (await _initialization.Task == false)
             {
-                await _initialization.Task;
+                return OperationResult<IResource>.FailedWithNotInitializeResult();
+            }
 
-                var result = new OperationResult<IResource>();
-                try
+            var result = new OperationResult<IResource>();
+
+            try
+            {
+                ItemReference parentRef = new()
                 {
-                    ItemReference parentRef = new()
-                    {
-                        Id = targetId,
-                        DriveId = _driveId
-                    };
+                    Id = targetId,
+                    DriveId = _driveId
+                };
 
-                    var request = _graphServiceClient.Me.Drive.Items[id].Copy(parentReference: parentRef).Request();
-                    var message = new HttpRequestMessage(HttpMethod.Post, request.RequestUrl);
-                    var json = $"{{\"parentReference\":{{\"driveId\":\"{parentRef.DriveId}\",\"id\":\"{parentRef.Id}\"}}}}";
-                    message.Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                    await _graphServiceClient.AuthenticationProvider.AuthenticateRequestAsync(message);
+                var request = _graphServiceClient.Me.Drive.Items[id].Copy(parentReference: parentRef).Request();
+                using var message = new HttpRequestMessage(HttpMethod.Post, request.RequestUrl);
+                var json = $"{{\"parentReference\":{{\"driveId\":\"{parentRef.DriveId}\",\"id\":\"{parentRef.Id}\"}}}}";
+                message.Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                await _graphServiceClient.AuthenticationProvider.AuthenticateRequestAsync(message);
 
-                    HttpResponseMessage response = await _graphServiceClient.HttpProvider.SendAsync(message);
-
-                    if (!response.IsSuccessStatusCode || response.Headers.Location == null)
-                    {
-                        await result.FailedBasedHttpResponce(response);
-                        return result;
-                    }
-
-                    var copingCompleted = false;
-                    string resourceId = null;
-                    using var httpClient = new HttpClient();
-                    do
-                    {
-                        var statusMessage = new HttpRequestMessage(HttpMethod.Get, response.Headers.Location);
-                        var statusResponce = await httpClient.SendAsync(statusMessage);
-
-                        if (!statusResponce.IsSuccessStatusCode)
-                        {
-                            await result.FailedBasedHttpResponce(statusResponce);
-                            return result;
-                        }
-
-                        var content = await statusResponce.Content.ReadAsStringAsync();
-                        var resultStatus = _graphServiceClient.HttpProvider.Serializer.DeserializeObject<Dictionary<string, string>>(content);
-                        copingCompleted = resultStatus != null && resultStatus.ContainsKey("status") && resultStatus?["status"] == "completed";
-                        if (copingCompleted)
-                        {
-                            resultStatus.TryGetValue("resourceId", out resourceId);
-                        }
-                        else
-                        {
-                            await Task.Delay(500);
-                        }
-                    }
-                    while (!copingCompleted);
-
-                    if (string.IsNullOrEmpty(resourceId))
-                    {
-                        result.Status = ResutlStatus.Failed;
-                        result.ErrorMessage = "Copying resource is failed.";
-                        return result;
-                    }
-
-                    var getRequest = await Get(resourceId);
-                    result.CompleteAsResult(getRequest);
+                using HttpResponseMessage response = await _graphServiceClient.HttpProvider.SendAsync(message);
+                if (!response.IsSuccessStatusCode || response.Headers.Location == null)
+                {
+                    await result.FailedBasedHttpResponce(response);
                     return result;
                 }
-                catch (Exception ex)
+
+                var copingCompleted = false;
+                string resourceId = null;
+                using var httpClient = new HttpClient();
+                do
                 {
-                    result.FailedWithException(ex);
+                    using var statusMessage = new HttpRequestMessage(HttpMethod.Get, response.Headers.Location);
+                    using var statusResponce = await httpClient.SendAsync(statusMessage);
+
+                    if (!statusResponce.IsSuccessStatusCode)
+                    {
+                        await result.FailedBasedHttpResponce(statusResponce);
+                        return result;
+                    }
+
+                    var content = await statusResponce.Content.ReadAsStringAsync();
+                    var resultStatus = _graphServiceClient.HttpProvider.Serializer.DeserializeObject<Dictionary<string, string>>(content);
+                    copingCompleted = resultStatus != null && resultStatus.ContainsKey("status") && resultStatus?["status"] == "completed";
+                    if (copingCompleted)
+                    {
+                        resultStatus.TryGetValue("resourceId", out resourceId);
+                    }
+                    else
+                    {
+                        await Task.Delay(500);
+                    }
+                }
+                while (!copingCompleted); // todo add max time wait interval, e.g. 60sec.
+
+                if (string.IsNullOrEmpty(resourceId))
+                {
+                    result.Status = ResutlStatus.Failed;
+                    result.ErrorMessage = "Copying resource is failed.";
+                    return result;
                 }
 
+                var getRequest = await Get(resourceId);
+                result.CompleteWithResult(getRequest);
                 return result;
-            });
+            }
+            catch (Exception ex)
+            {
+                result.FailedWithException(ex);
+            }
+
+            return result;
+
         }
 
         private IResource CreateResourceInternal(DriveItem item)
@@ -351,7 +360,7 @@ namespace StorageLib.OneDrive
                 item.WebUrl);
         }
 
-        private Operations _supportedOperations =
+        private readonly Operations _supportedOperations =
                                                 Operations.CopyFile |
                                                 Operations.CopyFolder |
                                                 Operations.DeleteFile |
@@ -363,11 +372,13 @@ namespace StorageLib.OneDrive
         ///<inheritdoc/>
         public string CloudStorageName => "OneDrive";
 
+        ///<inheritdoc/>
         public bool IsOperationSupported(Operations operation)
         {
             return (operation & _supportedOperations) == operation;
         }
 
+        ///<inheritdoc/>
         public async Task SignOut()
         {
             foreach (var user in await _clientApp.GetAccountsAsync())
@@ -377,59 +388,64 @@ namespace StorageLib.OneDrive
             TokenCacheHelper.ClearCacheAsync();
         }
 
+        ///<inheritdoc/>
         public void Dispose()
         {
+            _initialization.TrySetResult(false);
             _clientApp = null;
             _graphServiceClient = null;
         }
 
-        public Task<OperationResult<IResource>> Upload(string fileName, string parentId, Stream stream, string contentType)
+        ///<inheritdoc/>
+        public async Task<OperationResult<IResource>> Upload(string fileName, string parentId, Stream stream, string contentType)
         {
-            return Task.Run(async () =>
+            if (await _initialization.Task == false)
             {
-                await _initialization.Task;
+                return OperationResult<IResource>.FailedWithNotInitializeResult();
+            }
 
-                // https://docs.microsoft.com/ru-ru/graph/sdks/large-file-upload?tabs=csharp
-                var result = new OperationResult<IResource>();
+            // https://docs.microsoft.com/ru-ru/graph/sdks/large-file-upload?tabs=csharp
+            var result = new OperationResult<IResource>();
+
+            try
+            {
                 var uploadProps = new DriveItemUploadableProperties
                 {
                     ODataType = null,
                     Name = fileName,
                     AdditionalData = new Dictionary<string, object> { { "@microsoft.graph.conflictBehavior", "rename" } }
                 };
-                
-                try
-                {
-                    UploadSession uploadSession = await _graphServiceClient.Me.Drive.Items[parentId]
-                                                            .ItemWithPath(fileName)
-                                                            .CreateUploadSession(uploadProps)
-                                                            .Request()
-                                                            .PostAsync();
-                    
-                    // Max slice size must be a multiple of 320 KiB
-                    int maxSliceSize = 320 * 1024;
+                UploadSession uploadSession = await _graphServiceClient.Me.Drive.Items[parentId]
+                                                        .ItemWithPath(fileName)
+                                                        .CreateUploadSession(uploadProps)
+                                                        .Request()
+                                                        .PostAsync();
 
-                    var fileUploadTask =
-                        new LargeFileUploadTask<DriveItem>(uploadSession, stream, maxSliceSize, _graphServiceClient);
+                // Max slice size must be a multiple of 320 KiB
+                int maxSliceSize = 320 * 1024;
 
-                    // Upload the file
-                    var uploadResult = await fileUploadTask.UploadAsync();
-                    if (uploadResult.UploadSucceeded)
-                    {
-                        result.Status = ResutlStatus.Succeed;
-                        result.Result = CreateResourceInternal(uploadResult.ItemResponse);
-                    }
-                    else
-                    {
-                        result.Status = ResutlStatus.Failed;
-                    }
-                }
-                catch (Exception ex)
+                var fileUploadTask =
+                    new LargeFileUploadTask<DriveItem>(uploadSession, stream, maxSliceSize, _graphServiceClient);
+
+                // Upload the file
+                var uploadResult = await fileUploadTask.UploadAsync();
+                if (uploadResult.UploadSucceeded)
                 {
-                    result.FailedWithException(ex);
+                    result.Status = ResutlStatus.Succeed;
+                    result.Result = CreateResourceInternal(uploadResult.ItemResponse);
                 }
-                return result;
-            });
+                else
+                {
+                    result.Status = ResutlStatus.Failed;
+                }
+            }
+            catch (Exception ex)
+            {
+                result.FailedWithException(ex);
+            }
+
+            return result;
+
         }
     }
 }

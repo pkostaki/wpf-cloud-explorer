@@ -32,7 +32,7 @@ namespace StorageLib.OneDrive
         /// </summary>
         private static string CacheFilePath { get; set; }
 
-        private static readonly object FileLock = new object();
+        private static readonly object FileLock = new();
         private static void BeforeAccessNotification(TokenCacheNotificationArgs args)
         {
             lock (FileLock)

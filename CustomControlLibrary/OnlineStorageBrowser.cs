@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -78,14 +79,19 @@ namespace CustomControlLibrary
             get { return (string)GetValue(StatusProperty); }
         }
 
-
-
-
         #endregion
 
+        public string OperationStatus
+        {
+            get { return (string)GetValue(OperationStatusProperty); }
+            set { SetValue(OperationStatusProperty, value); }
+        }
 
+        // Using a DependencyProperty as the backing store for OperationStatus.  This enables animation, styling, binding, etc...
+        public static readonly DependencyProperty OperationStatusProperty =
+            DependencyProperty.Register(nameof(OperationStatus), typeof(string), typeof(OnlineStorageBrowser), new PropertyMetadata(string.Empty));
 
-
+ 
         static OnlineStorageBrowser()
         {
             DefaultStyleKeyProperty.OverrideMetadata(typeof(OnlineStorageBrowser), new FrameworkPropertyMetadata(typeof(OnlineStorageBrowser)));
@@ -235,15 +241,43 @@ namespace CustomControlLibrary
 
         private void RegisterCommands()
         {
+            Func<bool, bool, string, IResource> getResource = (isTreeView, isDataGrid, parameter) =>
+            {
+                if (isTreeView && (parameter == null || parameter == "tree"))
+                {
+                    return (IResource)_elementTreeView.SelectedItem;
+                }
+                if (isDataGrid)
+                {
+                    var selected = (IResource)_elementDataGrid.SelectedItem;
+                    if (parameter == "cell")
+                    {
+                        return selected;
+                    }
+                    if (parameter == null || parameter == "outCell")
+                    {
+                        if (selected == null)
+                        {
+                            return (IResource)_elementTreeView.SelectedItem;
+                        }
+                        return selected;
+                    }
+                }
+                return null;
+            };
+
             _commandsHelper.RegisterCommand(ApplicationCommands.Delete,
                 new CommandDescription(
-                    canExecuted: (resource, parameter) =>
+                    canExecuted: (isTreeView, isDataGrid, parameter) =>
                     {
+                        var resource = getResource(isTreeView, isDataGrid, parameter);
                         return Storage != null && ResourceHelper.HasAliveParent(resource)
                         && Storage.IsOperationSupported(resource.IsFolder ? Operations.DeleteFolder : Operations.DeleteFile);
                     },
-                    execute: (resource, parameter) =>
+                    execute: (isTreeView, isDataGrid, parameter) =>
                     {
+                        var resource = getResource(isTreeView, isDataGrid, parameter);
+
                         if (MessageBox.Show($"Deleting resource: {resource.Name}?",
                             "Deletion",
                             MessageBoxButton.YesNo,
@@ -256,69 +290,79 @@ namespace CustomControlLibrary
 
             _commandsHelper.RegisterCommand(ApplicationCommands.Copy,
                 new CommandDescription(
-                    canExecuted: (resource, parameter) =>
+                    canExecuted: (isTreeView, isDataGrid, parameter) =>
                     {
+                        var resource = getResource(isTreeView, isDataGrid, parameter);
+                        // If resource has a parent that means that resource is not a root.
                         return Storage != null && ResourceHelper.HasAliveParent(resource) &&
                         Storage.IsOperationSupported(resource.IsFolder ? Operations.CopyFolder : Operations.CopyFile);
                     },
-                    execute: (resource, parameter) => { _commandsHelper.PutBuffer(resource); }
+                    execute: (isTreeView, isDataGrid, parameter) => {
+                        var resource = getResource(isTreeView, isDataGrid, parameter);
+                        _commandsHelper.PutBuffer(resource); 
+                    }
                 ));
 
             _commandsHelper.RegisterCommand(ApplicationCommands.Cut,
                 new CommandDescription(
-                    canExecuted: (resource, parameter) =>
+                    canExecuted: (isTreeView, isDataGrid, parameter) =>
                     {
+                        var resource = getResource(isTreeView, isDataGrid, parameter);
+
                         return Storage != null && ResourceHelper.HasAliveParent(resource) &&
                         Storage.IsOperationSupported(resource.IsFolder ? Operations.CutFolder : Operations.CutFile);
                     },
-                    execute: (resource, parameter) =>
+                    execute: (isTreeView, isDataGrid, parameter) =>
                     {
+                        var resource = getResource(isTreeView, isDataGrid, parameter);
                         _commandsHelper.PutBuffer(resource, true);
                     }
                 ));
 
-            Func<IResourceViewModel, IResource, IResource> GetPasteCommandTarget = (source, resource) =>
-              {
-                  if (!ResourceHelper.IsAlive(source) || !ResourceHelper.IsAlive(resource))
-                  {
-                      return null;
-                  }
+            Func<IResourceViewModel, IResource, IResource> getPasteTarget = (source, resource) =>
+            {
+                if (!ResourceHelper.IsAlive(source) || !ResourceHelper.IsAlive(resource))
+                {
+                    return null;
+                }
 
-                  if (resource.IsFolder)
-                  {
-                      return resource;
-                  }
+                if (resource.IsFolder)
+                {
+                    return resource;
+                }
 
-                  if (!ResourceHelper.IsAliveFolder(resource.Parent))
-                  {
-                      return null;
-                  }
+                if (!ResourceHelper.IsAliveFolder(resource.Parent))
+                {
+                    return null;
+                }
 
-                  IResource destinition = null;
-                  if (resource.Parent.Id != source.Parent.Id)
-                  {
-                      destinition = resource.Parent;
-                  }
-                  else
-                  {
-                      destinition = source.IsCutted ? null : resource.Parent;
-                  }
+                IResource destinition = null;
+                if (resource.Parent.Id != source.Parent.Id)
+                {
+                    destinition = resource.Parent;
+                }
+                else
+                {
+                    destinition = source.IsCutted ? null : resource.Parent;
+                }
 
-                  return destinition;
-              };
+                return destinition;
+            };
 
             _commandsHelper.RegisterCommand(ApplicationCommands.Paste,
                 new CommandDescription(
-                    canExecuted: (resource, parameter) =>
+                    canExecuted: (isTreeView, isDataGrid, parameter) =>
                     {
+                        var resource = getResource(isTreeView, isDataGrid, parameter);
                         IResourceViewModel source = _commandsHelper.GetBuffer() as IResourceViewModel;
-                        return Storage != null && GetPasteCommandTarget(source, resource) != null;
+                        return Storage != null && getPasteTarget(source, resource) != null;
                     },
 
-                    execute: (resource, parameter) =>
+                    execute: (isTreeView, isDataGrid, parameter) =>
                     {
+                        var resource = getResource(isTreeView, isDataGrid, parameter);
                         IResourceViewModel source = _commandsHelper.GetBuffer() as IResourceViewModel;
-                        var target = GetPasteCommandTarget(source, resource);
+                        var target = getPasteTarget(source, resource);
                         if (source.IsCutted)
                         {
                             Storage?.Move(source, target);
@@ -332,18 +376,20 @@ namespace CustomControlLibrary
                 );
 
             _commandsHelper.RegisterCommand(ApplicationCommands.Open, new CommandDescription(
-                canExecuted: (resource, parameter) =>
+                canExecuted: (isTreeView, isDataGrid, parameter) =>
                 {
-                    return ResourceHelper.IsAliveFolder(resource) && Storage.IsOperationSupported(Operations.UploadFile);
+                    var resource = getResource(isTreeView, isDataGrid, parameter);
+                    return Storage!=null && ResourceHelper.IsAliveFolder(resource) && Storage.IsOperationSupported(Operations.UploadFile);
                 },
-                execute: async (resource, parameter) =>
+                execute: async (isTreeView, isDataGrid, parameter) =>
                 {
                     OpenFileDialog openFileDialog = new OpenFileDialog();
                     if (openFileDialog.ShowDialog() == true)
                     {
                         using var stream = openFileDialog.OpenFile();
+                        var resource = getResource(isTreeView, isDataGrid, parameter);
                         // Todo find resonable way to get mime type for file
-                        await Storage.Upload(Path.GetFileName(openFileDialog.FileName), resource, stream, "");
+                        await Storage?.Upload(resource, Path.GetFileName(openFileDialog.FileName), stream, "");
                     }
                 }
             ));
@@ -366,8 +412,7 @@ namespace CustomControlLibrary
                 return;
             }
 
-            var resource = GetInputResource(sender, e.Command, e.Parameter as string);
-            e.CanExecute = _commandsHelper.CanExecuted(e.Command, resource, e.Parameter);
+            e.CanExecute = _commandsHelper.CanExecuted(e.Command, sender ==_elementTreeView, sender==_elementDataGrid, e.Parameter as string);
             e.Handled = true;
         }
 
@@ -378,44 +423,10 @@ namespace CustomControlLibrary
                 return;
             }
 
-            var resource = GetInputResource(sender, e.Command, e.Parameter as string);
-            _commandsHelper.Execute(e.Command, resource, e.Parameter);
+            _commandsHelper.Execute(e.Command, sender==_elementTreeView, sender == _elementDataGrid ,e.Parameter as string);
             e.Handled = true;
         }
 
-        private IResource GetInputResource(object sender, ICommand command, string parameter)
-        {
-            if (sender is TreeView treeview && (parameter == null || parameter == "tree"))
-            {
-                return treeview.SelectedItem as IResource;
-            }
-
-            if (sender is not DataGrid dataGrid)
-            {
-                return null;
-            }
-
-            var selected = dataGrid.SelectedItem as IResource;
-            // Null means that command activated through keyboard.
-            // Cell means that command activated not directly at resource view, but at area of datagrid.
-            if (parameter == null || parameter == "outCell")
-            {
-                if (command == ApplicationCommands.Open || command == ApplicationCommands.Paste)
-                {
-                    if (selected == null)
-                    {
-                        return _elementTreeView.SelectedItem as IResource;
-                    }
-
-                    return ResourceHelper.IsAliveFolder(selected) ? selected :
-                         ResourceHelper.HasAliveParentFolder(selected) ? selected.Parent : null;
-                }
-
-                return selected;
-            }
-
-            return selected;
-        }
         #endregion
 
         private void ElementTreeViewSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -425,7 +436,7 @@ namespace CustomControlLibrary
                 return;
             }
 
-            resource.Load();
+            Task.Run(()=> resource.Load());
         }
 
         private void AwareIsAnyResourceSelected()
@@ -470,7 +481,7 @@ namespace CustomControlLibrary
         private void SetupStorage(IStorage storage)
         {
             AwareIsAnyResourceSelected();
-            SetValue(StatusPropertyKey, $"Connected: {storage.StorageName}");
+            SetValue(StatusPropertyKey, $"Connected: {storage.CloudStorageName}");
         }
 
         private void ReleaseStorage(IStorage storage)
@@ -491,14 +502,14 @@ namespace CustomControlLibrary
         #region Commands helpers
         private class CommandDescription
         {
-            public CommandDescription(Func<IResource, object, bool> canExecuted, Action<IResource, object> execute)
+            public CommandDescription(Func<bool, bool, string, bool> canExecuted, Action<bool, bool, string> execute)
             {
                 CanExecuted = canExecuted;
                 Execute = execute;
             }
 
-            public Func<IResource, object, bool> CanExecuted { get; }
-            public Action<IResource, object> Execute { get; }
+            public Func<bool, bool, string, bool> CanExecuted { get; }
+            public Action<bool, bool, string> Execute { get; }
         }
 
         private class CommandsHelper
@@ -516,14 +527,14 @@ namespace CustomControlLibrary
                 _commands.Remove(command);
             }
 
-            public bool CanExecuted(ICommand command, IResource resource, object parameter)
+            public bool CanExecuted(ICommand command, bool isTreeView, bool isDataGrid, string parameter)
             {
-                return _commands.ContainsKey(command) && _commands[command].CanExecuted.Invoke(resource, parameter);
+                return _commands.ContainsKey(command) && _commands[command].CanExecuted.Invoke(isTreeView, isDataGrid, parameter);
             }
 
-            public void Execute(ICommand command, IResource resource, object parameter)
+            public void Execute(ICommand command, bool isTreeView, bool isDataGrid, string parameter)
             {
-                _commands[command].Execute.Invoke(resource, parameter);
+                _commands[command].Execute.Invoke(isTreeView, isDataGrid, parameter);
             }
 
             public bool IsRegisteredCommand(ICommand command) => _commands.ContainsKey(command);

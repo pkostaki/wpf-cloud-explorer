@@ -5,7 +5,7 @@ using System.Windows.Data;
 namespace CustomControlLibrary
 {
     /// <summary>
-    /// Converter of long value (i.g. bytes into kbytes )
+    /// Converter of long value (i.g. bytes into kbytes ).
     /// </summary>
     public class LongValueConvertor : IValueConverter
     {

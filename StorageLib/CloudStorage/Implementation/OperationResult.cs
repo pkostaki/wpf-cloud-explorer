@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace StorageLib.CloudStorage.Implementation
 {
+    /// <summary>
+    /// Operations.
+    /// </summary>
     [Flags]
     public enum Operations
     {
@@ -19,6 +22,9 @@ namespace StorageLib.CloudStorage.Implementation
         UploadFile = 64
     }
 
+    /// <summary>
+    /// Operation result.
+    /// </summary>
     public enum ResutlStatus
     {
         None = 0,
@@ -27,9 +33,9 @@ namespace StorageLib.CloudStorage.Implementation
     }
 
     /// <summary>
-    /// Class that describe result of operation.
+    /// Represent the result of operation.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="T">Type of result.</typeparam>
     public class OperationResult<T> : INotifyPropertyChanged
     {
         private ResutlStatus _status = ResutlStatus.None;
@@ -40,6 +46,7 @@ namespace StorageLib.CloudStorage.Implementation
         /// Status of operation.
         /// </summary>
         public ResutlStatus Status { get => _status; set => Set(ref _status, value); }
+
         /// <summary>
         /// Error code if available.
         /// </summary>
@@ -54,7 +61,8 @@ namespace StorageLib.CloudStorage.Implementation
         /// Result.
         /// </summary>
         public T Result { get; set; }
-
+        
+        ///<inheritdoc/>
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected void Set<K>(ref K property, K value, [CallerMemberName] string propName = null)
@@ -63,12 +71,11 @@ namespace StorageLib.CloudStorage.Implementation
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
         }
 
-
         /// <summary>
-        /// Succeed with result.
+        /// Succeed operation with <paramref name="result"/>.
         /// </summary>
         /// <param name="result">Result.</param>
-        /// <returns></returns>
+        /// <returns>Operation result.</returns>
         public OperationResult<T> SucceedWithResult(T result)
         {
             Status = ResutlStatus.Succeed;
@@ -77,10 +84,10 @@ namespace StorageLib.CloudStorage.Implementation
         }
 
         /// <summary>
-        /// Failed with exception.
+        /// Failed operation with <paramref name="ex"/>.
         /// </summary>
         /// <param name="ex">Exception.</param>
-        /// <returns></returns>
+        /// <returns>Operation result.</returns>
         public OperationResult<T> FailedWithException(Exception ex)
         {
             Status = ResutlStatus.Failed;
@@ -90,24 +97,24 @@ namespace StorageLib.CloudStorage.Implementation
         }
 
         /// <summary>
-        /// Failed with result.
+        /// Failed operation with <paramref name="result"/>.
         /// </summary>
-        /// <param name="failedResult">result</param>
-        /// <returns></returns>
-        public OperationResult<T> FailedWithResult(OperationResult<T> failedResult)
+        /// <param name="result">result</param>
+        /// <returns>Operation result.</returns>
+        public OperationResult<T> FailedWithResult(OperationResult<T> result)
         {
             Status = ResutlStatus.Failed;
-            ErrorCode = failedResult.ErrorCode;
-            ErrorMessage = failedResult.ErrorMessage;
+            ErrorCode = result.ErrorCode;
+            ErrorMessage = result.ErrorMessage;
             return this;
         }
 
         /// <summary>
-        /// Complete with depending on request result.
+        /// Repeat operation of <paramref name="result"/>.
         /// </summary>
         /// <param name="result">Request result.</param>
-        /// <returns></returns>
-        public OperationResult<T> CompleteAsResult(OperationResult<T> result)
+        /// <returns>Operation result.</returns>
+        public OperationResult<T> CompleteWithResult(OperationResult<T> result)
         {
             Status = result.Status;
             ErrorCode = result.ErrorCode;
@@ -116,6 +123,11 @@ namespace StorageLib.CloudStorage.Implementation
             return this;
         }
 
+        /// <summary>
+        /// Failed operation based on <paramref name="response"/>
+        /// </summary>
+        /// <param name="response"><see cref="HttpResponseMessage"/></param>
+        /// <returns>Operation result.</returns>
         public async Task<OperationResult<T>> FailedBasedHttpResponce(HttpResponseMessage response)
         {
             Status = ResutlStatus.Failed;
@@ -125,6 +137,21 @@ namespace StorageLib.CloudStorage.Implementation
                 ErrorMessage = await response.RequestMessage.Content.ReadAsStringAsync();
             }
             return this;
+        }
+
+        /// <summary>
+        /// Create not initialize operation result.
+        /// </summary>
+        /// <typeparam name="T">Type of result.</typeparam>
+        /// <returns></returns>
+        public static OperationResult<T> FailedWithNotInitializeResult()
+        {
+            return new OperationResult<T>
+            {
+                Status = ResutlStatus.Failed,
+                ErrorMessage = "Storage not initialized.",
+                Result = default(T)
+            };
         }
 
     }

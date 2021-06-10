@@ -51,6 +51,11 @@ namespace StorageLib.CloudStorage.Api
         /// <returns>Operation result with new instance of copied resource.</returns>
         Task<OperationResult<IResource>> Copy(string id, string targetId);
 
+        /// <summary>
+        /// True if current storage suppors an <paramref name="operation"/>.
+        /// </summary>
+        /// <param name="operation">Operation.</param>
+        /// <returns></returns>
         bool IsOperationSupported(Operations operation);
 
         /// <summary>
@@ -63,19 +68,19 @@ namespace StorageLib.CloudStorage.Api
         Task<OperationResult<IResource>> Move(string id, string parentId, string targetId);
 
         /// <summary>
-        /// Upload file
+        /// Upload file.
         /// </summary>
         /// <param name="fileName">Name of file.</param>
         /// <param name="parentId">Parent resource id.</param>
         /// <param name="stream">Content stream.</param>
         /// <param name="contentType">Content type.</param>
-        /// <returns></returns>
+        /// <returns>Operation result.</returns>
         Task<OperationResult<IResource>> Upload(string fileName, string parentId, Stream stream, string contentType);
 
         /// <summary>
         /// Sign out current session.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Task.</returns>
         Task SignOut();
     }
 }

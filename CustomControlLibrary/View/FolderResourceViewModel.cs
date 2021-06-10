@@ -85,6 +85,7 @@ namespace CustomControlLibrary
         
         public override void Dispose()
         {
+            _folders.Clear();
             Resources.CollectionChanged -= Resources_CollectionChanged;
             base.Dispose();
         }

@@ -2,7 +2,9 @@
 
 namespace StorageLib.CloudStorage.Implementation
 {
-
+    /// <summary>
+    /// Represent folder resource.
+    /// </summary>
     public class FolderResource : Resource
     {
         public FolderResource()
@@ -13,6 +15,7 @@ namespace StorageLib.CloudStorage.Implementation
         private TaskCompletionSource _loading;
         private readonly object _lock = new();
         
+        ///<inheritdoc/>
         public override Task Load()
         {
             lock (_lock)

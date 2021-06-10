@@ -3,7 +3,7 @@
 namespace CustomControlLibrary
 {
     /// <summary>
-    /// Represent view of resource
+    /// Represent view of resource.
     /// </summary>
     public interface IResourceViewModel : IResource
     {       
