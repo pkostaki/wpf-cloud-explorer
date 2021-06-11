@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace StorageTest
 {
+    //todo cover upload functionality
     public class Tests
     {
         private StubCloudApi _api;
@@ -123,8 +124,6 @@ namespace StorageTest
             storage.Dispose();
         }     
         
-    
-        
         [Test]
         [TestCase(1,2, ResutlStatus.Failed)]
         [TestCase(0, 2, ResutlStatus.Succeed)]
@@ -144,12 +143,6 @@ namespace StorageTest
                             source.Id,
                             null, null, "moved", null, null,null)
             };
-
-            Assert.IsTrue(storage.Resources.Count == 1, "Unexpected situation.");
-            Assert.IsTrue(rootResource.Name == "root", "Unexpected situation.");
-            Assert.IsTrue(rootResource.Resources.Count == 3, "Unexpected situation.");
-            Assert.IsTrue(source.Resources.Count == 0, "Unexpected situation.");
-            Assert.IsTrue(target.Resources.Count == 0, "Unexpected situation.");
 
             var opresult = await storage.Move(source, target);
 
@@ -198,12 +191,6 @@ namespace StorageTest
                 Status = expectedStatus,
                 Result = expectedStatus==ResutlStatus.Succeed
             };
-
-            Assert.IsTrue(storage.Resources.Count == 1, "Unexpected situation.");
-            Assert.IsTrue(rootResource.Name == "root", "Unexpected situation.");
-            Assert.IsTrue(rootResource.Resources.Count == 3, "Unexpected situation.");
-            Assert.IsTrue(deleted.Resources.Count == 0, "Unexpected situation.");
-            Assert.IsTrue(deleted.Parent == rootResource, "Unexpected situation.");
 
             var opresult = await storage.Delete(deleted);
             
@@ -289,9 +276,9 @@ namespace StorageTest
 
         public bool IsOperationSupported(Operations operation)
         {
-            throw new System.NotImplementedException();
+            return true;
         }
-
+        
         public Task<OperationResult<IResource>> Upload(string fileName, string parentId, Stream stream, string contentType)
         {
             throw new System.NotImplementedException();

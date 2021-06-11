@@ -187,12 +187,14 @@
                                 Background="CornflowerBlue"
                                 ShowsPreview="True" />
                             <StatusBar
+                                Grid.Row="1"
                                 Grid.ColumnSpan="3"
                                 VerticalAlignment="Bottom"
                                 Background="RosyBrown">
                                 <StatusBarItem>
                                     <TextBlock Padding="3" Text="{TemplateBinding Status}" />
                                 </StatusBarItem>
+                                <Separator Margin="2"/>
                                 <StatusBarItem>
                                     <TextBlock Padding="3" Text="{TemplateBinding OperationStatus}" />
                                 </StatusBarItem>

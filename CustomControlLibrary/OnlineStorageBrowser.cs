@@ -303,7 +303,8 @@ namespace CustomControlLibrary
                             MessageBoxButton.YesNo,
                             MessageBoxImage.Question) == MessageBoxResult.Yes)
                         {
-                            await ListenOperationExecution("Delete", Storage?.Delete(resource));
+                            var operation = Storage?.Delete(resource);
+                            _ = GetOperationStatusInfo("Delete", operation);
                         }
                     }
                 ));
@@ -385,17 +386,18 @@ namespace CustomControlLibrary
                         var resource = getResource(isTreeView, isDataGrid, parameter);
                         IResourceViewModel source = _commandsHelper.GetBuffer() as IResourceViewModel;
                         var target = getPasteTarget(source, resource);
-                        Task<OperationResult<IResource>> resultTask;
+                        Task<OperationResult<IResource>> operation;
                         if (source.IsCutted)
                         {
-                            resultTask = Storage?.Move(source, target);
+                            operation = Storage?.Move(source, target);
                         }
                         else
                         {
-                            resultTask = Storage?.Copy(source, target);
+                            operation = Storage?.Copy(source, target);
                         }
                         _commandsHelper.ClearBuffer();
-                        await ListenOperationExecution("Paste", resultTask);
+                        _ =GetOperationStatusInfo("Paste", operation);
+                        await operation;
                     })
                 );
 
@@ -413,13 +415,15 @@ namespace CustomControlLibrary
                         using var stream = openFileDialog.OpenFile();
                         var resource = getResource(isTreeView, isDataGrid, parameter);
                         // Todo find resonable way to get mime type for file
-                        await ListenOperationExecution("Uploading", Storage?.Upload(resource, Path.GetFileName(openFileDialog.FileName), stream, ""));
+                        var operation = Storage?.Upload(resource, Path.GetFileName(openFileDialog.FileName), stream, "");
+                        _ = GetOperationStatusInfo("Uploading", operation);
+                        await operation;
                     }
                 }
             ));
         }
-
-        private async Task ListenOperationExecution<T>(string name, Task<OperationResult<T>> operation)
+        // todo find better construction to listen operation info
+        private async Task GetOperationStatusInfo<T>(string name, Task<OperationResult<T>> operation)
         {
             SetValue(OperationStatusPropertyKey, $"Executes {name}");
             if (operation!=null)
