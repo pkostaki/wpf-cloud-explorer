@@ -11,6 +11,7 @@ namespace StorageLib.CloudStorage.Implementation
     {
         private readonly ICloudStorageApi _api;
 
+        ///<inheritdoc/>
         public ObservableCollection<IResource> Resources { get; private set; } = new();
         
         ///<inheritdoc/>

@@ -193,6 +193,9 @@
                                 <StatusBarItem>
                                     <TextBlock Padding="3" Text="{TemplateBinding Status}" />
                                 </StatusBarItem>
+                                <StatusBarItem>
+                                    <TextBlock Padding="3" Text="{TemplateBinding OperationStatus}" />
+                                </StatusBarItem>
                             </StatusBar>
                         </Grid>
                     </Border>

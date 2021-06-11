@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -98,17 +99,19 @@ namespace CustomControlLibrary
 
         #endregion
 
+        #region  Operation status
+
         public string OperationStatus
         {
             get { return (string)GetValue(OperationStatusProperty); }
-            set { SetValue(OperationStatusProperty, value); }
         }
+        private static readonly DependencyPropertyKey OperationStatusPropertyKey =
+            DependencyProperty.RegisterReadOnly(nameof(OperationStatus), typeof(string), typeof(OnlineStorageBrowser), new PropertyMetadata(string.Empty));
 
         // Using a DependencyProperty as the backing store for OperationStatus.  This enables animation, styling, binding, etc...
-        public static readonly DependencyProperty OperationStatusProperty =
-            DependencyProperty.Register(nameof(OperationStatus), typeof(string), typeof(OnlineStorageBrowser), new PropertyMetadata(string.Empty));
+        public static readonly DependencyProperty OperationStatusProperty = OperationStatusPropertyKey.DependencyProperty;
+        #endregion
 
- 
         static OnlineStorageBrowser()
         {
             DefaultStyleKeyProperty.OverrideMetadata(typeof(OnlineStorageBrowser), new FrameworkPropertyMetadata(typeof(OnlineStorageBrowser)));
@@ -291,7 +294,7 @@ namespace CustomControlLibrary
                         return Storage != null && ResourceHelper.HasAliveParent(resource)
                         && Storage.IsOperationSupported(resource.IsFolder ? Operations.DeleteFolder : Operations.DeleteFile);
                     },
-                    execute: (isTreeView, isDataGrid, parameter) =>
+                    execute: async (isTreeView, isDataGrid, parameter) =>
                     {
                         var resource = getResource(isTreeView, isDataGrid, parameter);
 
@@ -300,7 +303,7 @@ namespace CustomControlLibrary
                             MessageBoxButton.YesNo,
                             MessageBoxImage.Question) == MessageBoxResult.Yes)
                         {
-                            Storage?.Delete(resource);
+                            await ListenOperationExecution("Delete", Storage?.Delete(resource));
                         }
                     }
                 ));
@@ -316,7 +319,8 @@ namespace CustomControlLibrary
                     },
                     execute: (isTreeView, isDataGrid, parameter) => {
                         var resource = getResource(isTreeView, isDataGrid, parameter);
-                        _commandsHelper.PutBuffer(resource); 
+                        _commandsHelper.PutBuffer(resource);
+                        SetValue(OperationStatusPropertyKey, $"Copied resource: {resource.Name}");
                     }
                 ));
 
@@ -333,6 +337,7 @@ namespace CustomControlLibrary
                     {
                         var resource = getResource(isTreeView, isDataGrid, parameter);
                         _commandsHelper.PutBuffer(resource, true);
+                        SetValue(OperationStatusPropertyKey, $"Cut resource: {resource.Name}");
                     }
                 ));
 
@@ -375,20 +380,22 @@ namespace CustomControlLibrary
                         return Storage != null && getPasteTarget(source, resource) != null;
                     },
 
-                    execute: (isTreeView, isDataGrid, parameter) =>
+                    execute: async (isTreeView, isDataGrid, parameter) =>
                     {
                         var resource = getResource(isTreeView, isDataGrid, parameter);
                         IResourceViewModel source = _commandsHelper.GetBuffer() as IResourceViewModel;
                         var target = getPasteTarget(source, resource);
+                        Task<OperationResult<IResource>> resultTask;
                         if (source.IsCutted)
                         {
-                            Storage?.Move(source, target);
+                            resultTask = Storage?.Move(source, target);
                         }
                         else
                         {
-                            Storage?.Copy(source, target);
+                            resultTask = Storage?.Copy(source, target);
                         }
                         _commandsHelper.ClearBuffer();
+                        await ListenOperationExecution("Paste", resultTask);
                     })
                 );
 
@@ -406,10 +413,27 @@ namespace CustomControlLibrary
                         using var stream = openFileDialog.OpenFile();
                         var resource = getResource(isTreeView, isDataGrid, parameter);
                         // Todo find resonable way to get mime type for file
-                        await Storage?.Upload(resource, Path.GetFileName(openFileDialog.FileName), stream, "");
+                        await ListenOperationExecution("Uploading", Storage?.Upload(resource, Path.GetFileName(openFileDialog.FileName), stream, ""));
                     }
                 }
             ));
+        }
+
+        private async Task ListenOperationExecution<T>(string name, Task<OperationResult<T>> operation)
+        {
+            SetValue(OperationStatusPropertyKey, $"Executes {name}");
+            if (operation!=null)
+            {
+                var result = await operation;
+                if (result.Status == ResutlStatus.Succeed)
+                {
+                    SetValue(OperationStatusPropertyKey, $"Succeed!");
+                }
+                else
+                {
+                    SetValue(OperationStatusPropertyKey, $"Failed: {name} with error: {result.ErrorMessage}");
+                }
+            }
         }
 
         private void UnregisterCommands()
@@ -503,6 +527,8 @@ namespace CustomControlLibrary
 
         private void ReleaseStorage(IStorage storage)
         {
+            SetValue(OperationStatusPropertyKey, string.Empty);
+            
             storage.Resources.CollectionChanged -= OnStorageResourcesChanged;
             if (_elementTreeView?.SelectedItem is IResourceViewModel folder)
             {
