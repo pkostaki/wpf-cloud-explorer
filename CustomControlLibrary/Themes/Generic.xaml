@@ -1,7 +1,6 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:lib="clr-namespace:StorageLib.CloudStorage.Implementation;assembly=StorageLib"
     xmlns:local="clr-namespace:CustomControlLibrary"
     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
@@ -10,9 +9,10 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type local:OnlineStorageBrowser}">
                     <ControlTemplate.Resources>
-                        <DataTemplate x:Key="ResourceDataTemplate" DataType="{x:Type lib:Resource}">
+                        <DataTemplate x:Key="ResourceDataTemplate" DataType="{x:Type local:IResourceViewModel}">
                             <StackPanel x:Name="Container" Orientation="Horizontal">
                                 <Image
+                                    x:Name="Image"
                                     Height="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=local:OnlineStorageBrowser}, Path=IconSize, Mode=OneWay}"
                                     MaxWidth="50"
                                     Margin="3"
@@ -39,6 +39,13 @@
                                         <sys:Boolean>true</sys:Boolean>
                                     </DataTrigger.Value>
                                     <Setter TargetName="Container" Property="Background" Value="orange" />
+                                </DataTrigger>
+
+                                <DataTrigger Binding="{Binding IsCutted}">
+                                    <DataTrigger.Value>
+                                        <sys:Boolean>true</sys:Boolean>
+                                    </DataTrigger.Value>
+                                    <Setter TargetName="Container" Property="Opacity" Value="0.6" />
                                 </DataTrigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
