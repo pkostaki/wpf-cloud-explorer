@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -18,6 +17,24 @@ namespace CustomControlLibrary
     [TemplatePart(Name = "Part_TreeView", Type = typeof(TreeView))]
     public class OnlineStorageBrowser : Control
     {
+
+        #region TreeView resource template
+
+        /// <summary>
+        /// Get and set datatemplate for tree view of resource.
+        /// </summary>
+        public HierarchicalDataTemplate ResourceDataTemplate
+        {
+            get { return (HierarchicalDataTemplate)GetValue(ResourceDataTemplateProperty); }
+            set { SetValue(ResourceDataTemplateProperty, value); }
+        }
+
+        // Using a DependencyProperty as the backing store for ResourceDataTemplate.  This enables animation, styling, binding, etc...
+        public static readonly DependencyProperty ResourceDataTemplateProperty =
+            DependencyProperty.Register(nameof(ResourceDataTemplate), typeof(HierarchicalDataTemplate), typeof(OnlineStorageBrowser), new PropertyMetadata(null));
+        
+        #endregion
+
         #region Icon size
         /// <summary>
         /// Gets and sets icons size.

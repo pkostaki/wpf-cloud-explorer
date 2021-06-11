@@ -184,7 +184,7 @@
             x:Name="OnlineStorageBrowser"
             Grid.Row="1"
             FontSize="{Binding ElementName=FontSizeSlider, Path=Value}"
-            Foreground="Black"
+            Foreground="DarkOliveGreen"
             IconSize="{Binding ElementName=IconSizeSlider, Path=Value}" />
     </Grid>
 </Window>
