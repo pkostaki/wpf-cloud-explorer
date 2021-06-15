@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\question-mark.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StorageLib\StorageLib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Drawing.Common">
+      <HintPath>..\..\..\..\..\programs_toremove\nuget-packages\system.drawing.common\5.0.2\ref\netcoreapp3.0\System.Drawing.Common.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\question-mark.png" />
+  </ItemGroup>
+
+</Project>

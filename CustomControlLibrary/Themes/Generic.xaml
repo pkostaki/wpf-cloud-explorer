@@ -1,0 +1,208 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:CustomControlLibrary"
+    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <Style TargetType="{x:Type local:OnlineStorageBrowser}">
+        <Style.Resources>
+            <DataTemplate x:Key="ResourceView">
+                <StackPanel x:Name="Container" Orientation="Horizontal">
+                    <Image
+                        x:Name="Image"
+                        Height="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=local:OnlineStorageBrowser}, Path=IconSize, Mode=OneWay}"
+                        MaxWidth="50"
+                        Margin="3"
+                        VerticalAlignment="Center"
+                        Source="{Binding IconLink, TargetNullValue='pack://application:,,,/CustomControlLibrary;component/Assets/question-mark.png', FallbackValue='pack://application:,,,/CustomControlLibrary;component/Assets/question-mark.png'}"
+                        Stretch="Uniform"
+                        StretchDirection="Both" />
+                    <TextBlock
+                        x:Name="Text"
+                        Margin="3"
+                        VerticalAlignment="Center"
+                        Text="{Binding Path=Name}" />
+                </StackPanel>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsLoaded}">
+                        <DataTrigger.Value>
+                            <sys:Boolean>false</sys:Boolean>
+                        </DataTrigger.Value>
+                        <Setter TargetName="Text" Property="Opacity" Value="0.7" />
+                    </DataTrigger>
+
+                    <DataTrigger Binding="{Binding IsLoading}">
+                        <DataTrigger.Value>
+                            <sys:Boolean>true</sys:Boolean>
+                        </DataTrigger.Value>
+                        <Setter TargetName="Container" Property="Background" Value="orange" />
+                    </DataTrigger>
+
+                    <DataTrigger Binding="{Binding IsCutted}">
+                        <DataTrigger.Value>
+                            <sys:Boolean>true</sys:Boolean>
+                        </DataTrigger.Value>
+                        <Setter TargetName="Container" Property="Opacity" Value="0.6" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+        </Style.Resources>
+        <Setter Property="ResourceDataTemplate">
+            <Setter.Value>
+                <HierarchicalDataTemplate ItemsSource="{Binding Folders, Mode=OneWay}">
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ResourceView}" />
+                </HierarchicalDataTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type local:OnlineStorageBrowser}">
+                    <ControlTemplate.Resources>
+
+                        <ContextMenu x:Key="ResourceContextMenu">
+                            <MenuItem
+                                Command="ApplicationCommands.Delete"
+                                CommandParameter="tree"
+                                Header="Delete" />
+                            <MenuItem
+                                Command="ApplicationCommands.Copy"
+                                CommandParameter="tree"
+                                Header="Copy" />
+                            <MenuItem
+                                Command="ApplicationCommands.Cut"
+                                CommandParameter="tree"
+                                Header="Cut" />
+                            <MenuItem
+                                Command="ApplicationCommands.Paste"
+                                CommandParameter="tree"
+                                Header="Paste" />
+                            <MenuItem
+                                Command="ApplicationCommands.Open"
+                                CommandParameter="tree"
+                                Header="Upload" />
+                        </ContextMenu>
+                        <Style TargetType="TreeViewItem">
+                            <Setter Property="Foreground" Value="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=TreeView}, Path=Foreground}" />
+                            <Setter Property="IsExpanded" Value="True" />
+                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                            <Setter Property="ContextMenu" Value="{StaticResource ResourceContextMenu}" />
+                        </Style>
+                        <local:LongValueConvertor x:Key="NumericConvertor" />
+                    </ControlTemplate.Resources>
+                    <Border
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition Width="auto" />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition />
+                                <RowDefinition Height="auto" />
+                            </Grid.RowDefinitions>
+                            <TreeView
+                                x:Name="Part_TreeView"
+                                Grid.Column="0"
+                                Foreground="{TemplateBinding Foreground}"
+                                ItemTemplate="{TemplateBinding ResourceDataTemplate}"
+                                ItemsSource="{Binding RelativeSource={RelativeSource Mode=TemplatedParent}, Path=Storage.Resources, Mode=OneWay}"
+                                VirtualizingStackPanel.IsVirtualizing="True"
+                                VirtualizingStackPanel.VirtualizationMode="Recycling" />
+
+                            <DataGrid
+                                x:Name="Part_DataGrid"
+                                Grid.Column="2"
+                                AutoGenerateColumns="False"
+                                CanUserAddRows="False"
+                                CanUserDeleteRows="True"
+                                Foreground="{TemplateBinding Foreground}"
+                                IsReadOnly="False"
+                                IsTabStop="True"
+                                ItemsSource="{Binding ElementName=Part_TreeView, Path=SelectedItem.Resources, Mode=OneWay}"
+                                SelectionMode="Single"
+                                SelectionUnit="FullRow">
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem
+                                            Command="ApplicationCommands.Paste"
+                                            CommandParameter="outCell"
+                                            CommandTarget="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type ContextMenu}}, Path=PlacementTarget}"
+                                            Header="Paste" />
+                                        <Separator />
+                                        <MenuItem
+                                            Command="ApplicationCommands.Open"
+                                            CommandParameter="outCell"
+                                            CommandTarget="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type ContextMenu}}, Path=PlacementTarget}"
+                                            Header="Upload" />
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <Setter Property="ContextMenu">
+                                            <Setter.Value>
+                                                <ContextMenu>
+                                                    <MenuItem
+                                                        Command="ApplicationCommands.Delete"
+                                                        CommandParameter="cell"
+                                                        Header="Delete" />
+                                                    <MenuItem
+                                                        Command="ApplicationCommands.Copy"
+                                                        CommandParameter="cell"
+                                                        Header="Copy" />
+                                                    <MenuItem
+                                                        Command="ApplicationCommands.Cut"
+                                                        CommandParameter="cell"
+                                                        Header="Cut" />
+                                                    <MenuItem
+                                                        Command="ApplicationCommands.Paste"
+                                                        CommandParameter="cell"
+                                                        Header="Paste" />
+                                                    <Separator />
+                                                    <MenuItem
+                                                        Command="ApplicationCommands.Open"
+                                                        CommandParameter="cell"
+                                                        Header="Upload" />
+                                                </ContextMenu>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn CellTemplate="{StaticResource ResourceView}" Header="Name" />
+                                    <DataGridTextColumn Binding="{Binding Status}" Header="Status" />
+                                    <DataGridTextColumn Binding="{Binding ModifiedTime, StringFormat={}{0:g}}" Header="Date modified" />
+                                    <DataGridTextColumn Binding="{Binding ResourceType}" Header="Type" />
+                                    <DataGridTextColumn Binding="{Binding Size, Converter={StaticResource NumericConvertor}, ConverterParameter=0.0009765625, StringFormat={}{0:n2} kb}" Header="Size" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <GridSplitter
+                                Grid.Column="1"
+                                Width="5"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Stretch"
+                                Background="CornflowerBlue"
+                                ShowsPreview="True" />
+                            <StatusBar
+                                Grid.Row="1"
+                                Grid.ColumnSpan="3"
+                                VerticalAlignment="Bottom"
+                                Background="RosyBrown">
+                                <StatusBarItem>
+                                    <TextBlock Padding="3" Text="{TemplateBinding Status}" />
+                                </StatusBarItem>
+                                <Separator Margin="2"/>
+                                <StatusBarItem>
+                                    <TextBlock Padding="3" Text="{TemplateBinding OperationStatus}" />
+                                </StatusBarItem>
+                            </StatusBar>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>
